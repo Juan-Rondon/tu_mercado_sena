@@ -6,19 +6,19 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Image,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "http://192.168.1.2:8000/api";
+const API_BASE_URL = "http://192.168.1.11:8000/api";
 const defaultUserImage = require("../../assets/images/default_user.png");
 
 type PerfilResponse = {
@@ -71,7 +71,7 @@ const EditProfileScreen = () => {
     }
 
     if (limpio.startsWith("/storage/")) {
-      return `http://192.168.1.2:8000${limpio}`;
+      return `http://192.168.1.11:8000${limpio}`;
     }
 
     return limpio;

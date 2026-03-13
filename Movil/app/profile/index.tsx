@@ -17,11 +17,11 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const defaultProductImage = require("../../../MercadoSena/assets/images/imagedefault.png");
+const defaultProductImage = require("../../assets/images/imagedefault.png");
 const defaultUserImage = require("../../assets/images/default_user.png");
 
-const API_BASE_URL = "http://192.168.1.2:8000/api";
-const API_HOST = "http://192.168.1.2:8000";
+const API_BASE_URL = "http://192.168.1.11:8000/api";
+const API_HOST = "http://192.168.1.11:8000";
 
 type UsuarioPerfil = {
   id: number;

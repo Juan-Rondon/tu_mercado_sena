@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-const API_BASE_URL = "http://192.168.1.2:8000";
+const API_BASE_URL = "http://192.168.1.11:8000";
 
 type ApiProduct = {
   id: number;

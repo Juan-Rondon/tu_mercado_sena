@@ -10,7 +10,6 @@ interface Props {
   placeholder?: string;
   className?: string;
 
-  // ✅ nuevo: para que Home no tenga doble padding
   noOuterPadding?: boolean;
 }
 

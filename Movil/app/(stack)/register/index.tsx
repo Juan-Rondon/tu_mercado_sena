@@ -22,7 +22,7 @@ import ResetPasswordSheet from "@/components/sheets/ResetPasswordSheet";
 import { savePendingRegister } from "@/src/lib/pendingRegister";
 
 // const API_BASE_URL = "http://192.168.1.13:8000"; // ip 5g casa juan
-const API_BASE_URL = "http://192.168.1.2:8000";
+const API_BASE_URL = "http://192.168.1.11:8000";
 
 const RegisterScreen = () => {
   const router = useRouter();
