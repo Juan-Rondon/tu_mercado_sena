@@ -20,8 +20,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 const defaultProductImage = require("../../assets/images/imagedefault.png");
 const defaultUserImage = require("../../assets/images/default_user.png");
 
-const API_BASE_URL = "http://192.168.1.11:8000/api";
-const API_HOST = "http://192.168.1.11:8000";
+const API_BASE_URL = "https://omwekiatl.xyz/api";
+const API_HOST = "https://omwekiatl.xyz";
 
 type UsuarioPerfil = {
   id: number;
@@ -251,7 +251,7 @@ const ProfileScreen = () => {
             variant="text-only"
             color="secondary"
             FontText="text-xl"
-            onPress={() => router.push("/(tabs)/Configuracion")}
+            onPress={() => router.back()}
             icon={<Ionicons name="arrow-back" size={20} color="#1C65E3" />}
             iconPosition="left"
           >

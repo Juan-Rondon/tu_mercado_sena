@@ -3,7 +3,7 @@ import CustomInput from "@/components/inputs/CustomInput";
 import { getToken } from "@/src/lib/authToken";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -18,7 +18,24 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "http://192.168.1.11:8000";
+const API_BASE_URL = "https://omwekiatl.xyz";
+
+type Subcategoria = {
+  id: number;
+  nombre: string;
+  categoria_id?: number;
+};
+
+type Categoria = {
+  id: number;
+  nombre: string;
+  subcategorias?: Subcategoria[];
+};
+
+type Integridad = {
+  id: number;
+  nombre: string;
+};
 
 const VenderScreen = () => {
   const router = useRouter();
@@ -31,9 +48,155 @@ const VenderScreen = () => {
   const [cantidad, setCantidad] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ⚠️ IDs temporales (luego los traeremos dinámicos)
-  const [subcategoriaId] = useState(1);
-  const [integridadId] = useState(1);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+  const [integridades, setIntegridades] = useState<Integridad[]>([]);
+
+  const [categoriaId, setCategoriaId] = useState<number | null>(null);
+  const [subcategoriaId, setSubcategoriaId] = useState<number | null>(null);
+  const [integridadId, setIntegridadId] = useState<number | null>(null);
+
+  const [categoriaNombre, setCategoriaNombre] = useState("");
+  const [subcategoriaNombre, setSubcategoriaNombre] = useState("");
+  const [integridadNombre, setIntegridadNombre] = useState("");
+
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
+  const [loadingIntegridades, setLoadingIntegridades] = useState(false);
+
+  useEffect(() => {
+    cargarCategorias();
+    cargarIntegridades();
+  }, []);
+
+  const normalizarArray = (json: any) => {
+    if (Array.isArray(json)) return json;
+    if (Array.isArray(json?.data)) return json.data;
+    if (Array.isArray(json?.data?.data)) return json.data.data;
+    return [];
+  };
+
+  const limpiarNumero = (valor: string) => {
+    return valor.replace(/\D/g, "");
+  };
+
+  const formatearPesosCOP = (valor: string) => {
+    const soloNumeros = limpiarNumero(valor);
+
+    if (!soloNumeros) return "";
+
+    return soloNumeros.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const handleChangePrecio = (valor: string) => {
+    const formateado = formatearPesosCOP(valor);
+    setPrecio(formateado);
+  };
+
+  const handleChangeCantidad = (valor: string) => {
+    setCantidad(limpiarNumero(valor));
+  };
+
+  const cargarCategorias = async () => {
+    try {
+      setLoadingCategorias(true);
+
+      const token = await getToken();
+
+      if (!token) {
+        Alert.alert("Error", "No hay sesión activa.");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/categorias`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        Alert.alert("Error", json?.message || "No se pudieron cargar las categorías.");
+        setCategorias([]);
+        return;
+      }
+
+      const data = normalizarArray(json);
+      setCategorias(data);
+    } catch (error) {
+      Alert.alert("Error", "No fue posible cargar las categorías.");
+      setCategorias([]);
+    } finally {
+      setLoadingCategorias(false);
+    }
+  };
+
+  const cargarIntegridades = async () => {
+    try {
+      setLoadingIntegridades(true);
+
+      const token = await getToken();
+
+      if (!token) {
+        Alert.alert("Error", "No hay sesión activa.");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/integridad`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        Alert.alert("Error", json?.message || "No se pudieron cargar las integridades.");
+        setIntegridades([]);
+        return;
+      }
+
+      const data = normalizarArray(json);
+      setIntegridades(data);
+    } catch (error) {
+      Alert.alert("Error", "No fue posible cargar las integridades.");
+      setIntegridades([]);
+    } finally {
+      setLoadingIntegridades(false);
+    }
+  };
+
+  const seleccionarCategoria = (nombreCategoria: string) => {
+    const categoria = categorias.find((c) => c.nombre === nombreCategoria);
+    if (!categoria) return;
+
+    setCategoriaNombre(categoria.nombre);
+    setCategoriaId(categoria.id);
+
+    setSubcategoriaId(null);
+    setSubcategoriaNombre("");
+    setSubcategorias(categoria.subcategorias || []);
+  };
+
+  const seleccionarSubcategoria = (nombreSubcategoria: string) => {
+    const subcategoria = subcategorias.find((s) => s.nombre === nombreSubcategoria);
+    if (!subcategoria) return;
+
+    setSubcategoriaNombre(subcategoria.nombre);
+    setSubcategoriaId(subcategoria.id);
+  };
+
+  const seleccionarIntegridad = (nombreIntegridad: string) => {
+    const integridad = integridades.find((i) => i.nombre === nombreIntegridad);
+    if (!integridad) return;
+
+    setIntegridadNombre(integridad.nombre);
+    setIntegridadId(integridad.id);
+  };
 
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -66,7 +229,15 @@ const VenderScreen = () => {
   };
 
   const handlePublicar = async () => {
-    if (!nombre || !descripcion || !precio || !cantidad) {
+    if (
+      !nombre.trim() ||
+      !descripcion.trim() ||
+      !precio.trim() ||
+      !cantidad.trim() ||
+      !categoriaId ||
+      !subcategoriaId ||
+      !integridadId
+    ) {
       Alert.alert("Campos requeridos", "Completa todos los campos obligatorios.");
       return;
     }
@@ -74,7 +245,6 @@ const VenderScreen = () => {
     try {
       setLoading(true);
 
-      //const token = await AsyncStorage.getItem("token");
       const token = await getToken();
 
       if (!token) {
@@ -84,10 +254,11 @@ const VenderScreen = () => {
 
       const formData = new FormData();
 
-      formData.append("nombre", nombre);
-      formData.append("descripcion", descripcion);
-      formData.append("precio", String(Number(precio)));
-      formData.append("disponibles", String(Number(cantidad)));
+      formData.append("nombre", nombre.trim());
+      formData.append("descripcion", descripcion.trim());
+      formData.append("precio", limpiarNumero(precio));
+      formData.append("disponibles", limpiarNumero(cantidad));
+      formData.append("categoria_id", String(categoriaId));
       formData.append("subcategoria_id", String(subcategoriaId));
       formData.append("integridad_id", String(integridadId));
 
@@ -108,7 +279,7 @@ const VenderScreen = () => {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
         Alert.alert("Error", data?.message || "No se pudo crear el producto.");
@@ -117,7 +288,6 @@ const VenderScreen = () => {
 
       Alert.alert("Éxito", "Producto publicado correctamente.");
       router.back();
-
     } catch (error) {
       Alert.alert("Error", "No fue posible conectar con el servidor.");
     } finally {
@@ -169,9 +339,8 @@ const VenderScreen = () => {
           </View>
 
           <View className="m-4 rounded-xl border border-sextary-600 p-4 bg-white">
-
             <Text className="font-semibold mb-1">Nombre del Producto *</Text>
-            <CustomInput value={nombre} onChangeText={setNombre} />
+            <CustomInput value={nombre} onChangeText={setNombre} className="border border-green-600"/>
 
             <Text className="font-semibold mb-1 mt-2">
               Descripción (max 185 caracteres) *
@@ -187,23 +356,72 @@ const VenderScreen = () => {
             />
 
             <View className="flex-row justify-between mt-3">
-              <View style={{ width: "48%" }}>
-                <Text className="font-semibold mb-1">Precio (COP)*</Text>
+              <View style={{ width: "48%"}}>
+                <Text className="font-semibold mb-1">Precio (COP) *</Text>
                 <CustomInput
-                  type="number"
+                  type="text"
+                  className="border border-green-600"
                   value={precio}
-                  onChangeText={setPrecio}
+                  onChangeText={handleChangePrecio}
+                  placeholder="Ej: 25.000"
                 />
               </View>
+
               <View style={{ width: "48%" }}>
                 <Text className="font-semibold mb-1">Cantidad *</Text>
                 <CustomInput
-                  type="number"
+                  type="text"
+                  className="border border-green-600"
                   value={cantidad}
-                  onChangeText={setCantidad}
+                  onChangeText={handleChangeCantidad}
+                  placeholder="Ej: 10"
                 />
               </View>
             </View>
+
+            <Text className="font-semibold mb-1 mt-3">Categoría *</Text>
+            <CustomButton
+              variant="desplegar"
+              options={categorias.map((c) => c.nombre)}
+              placeholder={
+                loadingCategorias
+                  ? "Cargando categorías..."
+                  : categoriaNombre || "Seleccione categoría"
+              }
+              onSelect={seleccionarCategoria}
+            >
+              {categoriaNombre || "Seleccione categoría"}
+            </CustomButton>
+
+            <Text className="font-semibold mb-1 mt-3">Subcategoría *</Text>
+            <CustomButton
+              variant="desplegar"
+              options={subcategorias.map((s) => s.nombre)}
+              placeholder={
+                !categoriaId
+                  ? "Seleccione primero una categoría"
+                  : subcategoriaNombre || "Seleccione subcategoría"
+              }
+              onSelect={seleccionarSubcategoria}
+            >
+              {!categoriaId
+                ? "Seleccione primero una categoría"
+                : subcategoriaNombre || "Seleccione subcategoría"}
+            </CustomButton>
+
+            <Text className="font-semibold mb-1 mt-3">Integridad *</Text>
+            <CustomButton
+              variant="desplegar"
+              options={integridades.map((i) => i.nombre)}
+              placeholder={
+                loadingIntegridades
+                  ? "Cargando integridad..."
+                  : integridadNombre || "Seleccione integridad"
+              }
+              onSelect={seleccionarIntegridad}
+            >
+              {integridadNombre || "Seleccione integridad"}
+            </CustomButton>
 
             <Text className="font-semibold text-center mt-4">Imagen del producto</Text>
             <Text className="text-center text-gray-400 text-sm mb-3">Máximo 3</Text>
@@ -217,7 +435,8 @@ const VenderScreen = () => {
 
             <CustomButton
               variant="contained"
-              className="rounded-full py-3 bg-sextary-600 mt-4"
+              className="rounded-l-full rounded-r-full py-4"
+              color="sextary"
               onPress={handlePublicar}
             >
               <Text className="text-white text-lg text-center">
@@ -227,14 +446,11 @@ const VenderScreen = () => {
 
             <CustomButton
               variant="contained"
-              className="bg-red-600 rounded-full py-3 mt-3"
+              className="bg-red-600 rounded-l-full rounded-r-full py-4 mt-3"
               onPress={() => router.back()}
             >
-              <Text className="text-white text-lg text-center">
-                Cancelar
-              </Text>
+              <Text className="text-white text-lg text-center">Cancelar</Text>
             </CustomButton>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -294,7 +510,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#27AA4E",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,

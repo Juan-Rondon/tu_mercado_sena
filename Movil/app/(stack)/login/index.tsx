@@ -12,7 +12,7 @@ import CustomInput from "@/components/inputs/CustomInput";
 import ResetPasswordSheet from "@/components/sheets/ResetPasswordSheet";
 import { saveToken } from "@/src/lib/authToken";
 
-const API_BASE_URL = "http://192.168.1.11:8000";
+const API_BASE_URL = "https://omwekiatl.xyz";
 // const API_BASE_URL = "http://192.168.1.13:8000"; // casa juan 5g
 //const API_BASE_URL = "http://192.168.1.7:8000"; // ip jean
 // const API_BASE_URL = "http://192.168.18.4:8000"; IP Sebas
