@@ -329,7 +329,7 @@ const ProfileScreen = () => {
             <CustomButton
               variant="icon-only"
               color="sextary"
-              onPress={() => router.push("/")}
+              onPress={() => router.push("/(tabs)/Chats")}
               icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
             />
           </View>
