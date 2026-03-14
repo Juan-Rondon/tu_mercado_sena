@@ -475,12 +475,12 @@ const HomeScreen = () => {
               </ScrollView>
             </View>
 
-            {!loading && data.length > 0 ? (
+            {/* {!loading && data.length > 0 ? (
               <Text style={styles.resultsText}>
                 {data.length} producto{data.length !== 1 ? "s" : ""} encontrado
                 {data.length !== 1 ? "s" : ""}
               </Text>
-            ) : null}
+            ) : null} */}
           </View>
         }
         ListEmptyComponent={renderEmpty}
