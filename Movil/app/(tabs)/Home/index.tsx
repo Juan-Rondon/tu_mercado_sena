@@ -15,6 +15,7 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type ImageSourcePropType
 } from "react-native";
 
 const API_BASE_URL = "https://tumercadosena.shop";
@@ -48,13 +49,51 @@ type Item = {
   id: string;
   title: string;
   price: string;
-  imageSource: any;
+  imageSource?: ImageSourcePropType;
 };
 
 const formatCOP = (n: number) =>
   n.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 
 const limpiarNumero = (valor: string) => valor.replace(/\D/g, "");
+
+const normalizarUrlImagen = (url?: string | null) => {
+  if (!url) return null;
+
+  const limpio = url.trim();
+  if (!limpio) return null;
+
+  if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
+    return limpio;
+  }
+
+  if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
+    return `https://tumercadosena.shop/${limpio.replace(/^\/+/, "")}`;
+  }
+
+  return limpio;
+};
+
+const mapProductosAItems = (productos: ApiProduct[]): Item[] => {
+  return productos.map((p) => {
+    let imageUrl: string | null = null;
+
+    if (Array.isArray(p.fotos) && p.fotos.length > 0) {
+      imageUrl = normalizarUrlImagen(p.fotos[0].url);
+    }
+
+    const imageSource: ImageSourcePropType | undefined = imageUrl
+  ? { uri: imageUrl }
+  : undefined;
+
+    return {
+      id: String(p.id),
+      title: p.nombre,
+      price: formatCOP(Number(p.precio)),
+      imageSource,
+    };
+  });
+};
 
 const HomeScreen = () => {
   const [search, setSearch] = useState("");
@@ -82,23 +121,6 @@ const HomeScreen = () => {
   const itemWidth =
     (width - GAP * (numColumns - 1) - ITEM_PADDING * 2 * numColumns) /
     numColumns;
-
-  const normalizarUrlImagen = (url?: string | null) => {
-    if (!url) return null;
-
-    const limpio = url.trim();
-    if (!limpio) return null;
-
-    if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
-      return limpio;
-    }
-
-    if (limpio.startsWith("/storage/")) {
-      return `https://tumercadosena.shop${limpio}`;
-    }
-
-    return limpio;
-  };
 
   const fetchPerfil = async () => {
     try {
@@ -251,22 +273,7 @@ const HomeScreen = () => {
       productos.sort((a, b) => Number(b.precio) - Number(a.precio));
     }
 
-    return productos.map((p) => {
-      let imageUrl: string | null = null;
-
-      if (Array.isArray(p.fotos) && p.fotos.length > 0) {
-        imageUrl = p.fotos[0].url;
-      }
-
-      const imageSource = imageUrl ? { uri: imageUrl } : null;
-
-      return {
-        id: String(p.id),
-        title: p.nombre,
-        price: formatCOP(Number(p.precio)),
-        imageSource,
-      };
-    });
+    return mapProductosAItems(productos);
   }, [
     rawProducts,
     search,
@@ -474,13 +481,6 @@ const HomeScreen = () => {
                 </CustomButton>
               </ScrollView>
             </View>
-
-            {/* {!loading && data.length > 0 ? (
-              <Text style={styles.resultsText}>
-                {data.length} producto{data.length !== 1 ? "s" : ""} encontrado
-                {data.length !== 1 ? "s" : ""}
-              </Text>
-            ) : null} */}
           </View>
         }
         ListEmptyComponent={renderEmpty}
@@ -537,8 +537,6 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 23,
     overflow: "hidden",
-    // borderWidth: 2,
-    // borderColor: "#32CD32",
     backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",

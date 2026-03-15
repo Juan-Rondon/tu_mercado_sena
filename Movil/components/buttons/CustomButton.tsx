@@ -38,7 +38,7 @@ interface Props extends PressableProps {
   message?: string;
   placeholder?: string;
   onSelect?: (value: string) => void;
-  source?: ImageSourcePropType;
+  source?: ImageSourcePropType | null;
   defaultImage?: ImageSourcePropType;
 
   imageAspectRatio?: number;
@@ -214,21 +214,18 @@ const CustomButton = React.forwardRef<View, Props>(
           style={style}
           {...rest}
         >
-          <Image
-            resizeMode="cover"
-            style={{
-              width: '100%',
-              height: 150,
-              overflow: 'hidden',
-              borderRadius: 8,
-              marginBottom: 8,
-            }}
-            source={
-              typeof source === 'string'
-                ? { uri: source }
-                : source || defaultImage
-            }
-          />
+        
+        <Image
+          resizeMode="cover"
+          style={{
+            width: '100%',
+            height: 150,
+            overflow: 'hidden',
+            borderRadius: 8,
+            marginBottom: 8,
+          }}
+          source={source ?? defaultImage}
+        />
 
           <Content />
         </Pressable>
