@@ -21,7 +21,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // const API_BASE_URL = "http://192.168.1.13:8000"; // ip 5g casa juan
-const API_BASE_URL = "https://omwekiatl.xyz";
+const API_BASE_URL = "https://tumercadosena.shop";
 
 export default function VerifyScreen() {
   const router = useRouter();

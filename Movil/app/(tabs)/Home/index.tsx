@@ -17,7 +17,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-const API_BASE_URL = "https://omwekiatl.xyz";
+const API_BASE_URL = "https://tumercadosena.shop";
 const defaultUserImage = require("../../../assets/images/default_user.png");
 
 type ApiProduct = {
@@ -94,7 +94,7 @@ const HomeScreen = () => {
     }
 
     if (limpio.startsWith("/storage/")) {
-      return `https://omwekiatl.xyz${limpio}`;
+      return `https://tumercadosena.shop${limpio}`;
     }
 
     return limpio;

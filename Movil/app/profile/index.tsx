@@ -20,8 +20,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 const defaultProductImage = require("../../assets/images/imagedefault.png");
 const defaultUserImage = require("../../assets/images/default_user.png");
 
-const API_BASE_URL = "https://omwekiatl.xyz/api";
-const API_HOST = "https://omwekiatl.xyz";
+const API_BASE_URL = "https://tumercadosena.shop/api";
+const API_HOST = "https://tumercadosena.shop";
 
 type UsuarioPerfil = {
   id: number;

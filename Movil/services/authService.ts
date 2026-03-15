@@ -3,7 +3,7 @@ import axios from "axios";
 
 const api = axios.create({
   // baseURL: "http://192.168.1.13:8000/api", // ip 5g casa juan
-  baseURL: "https://omwekiatl.xyz/api",
+  baseURL: "https://tumercadosena.shop/api/",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

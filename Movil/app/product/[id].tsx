@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "https://omwekiatl.xyz";
+const API_BASE_URL = "https://tumercadosena.shop";
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();

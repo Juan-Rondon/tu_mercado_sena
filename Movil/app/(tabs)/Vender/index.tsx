@@ -2,8 +2,8 @@ import CustomButton from "@/components/buttons/CustomButton";
 import CustomInput from "@/components/inputs/CustomInput";
 import { getToken } from "@/src/lib/authToken";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "https://omwekiatl.xyz";
+const API_BASE_URL = "https://tumercadosena.shop/api";
 
 type Subcategoria = {
   id: number;
@@ -35,6 +35,7 @@ type Categoria = {
 type Integridad = {
   id: number;
   nombre: string;
+  descripcion?: string | null;
 };
 
 const VenderScreen = () => {
@@ -68,6 +69,30 @@ const VenderScreen = () => {
     cargarIntegridades();
   }, []);
 
+  const limpiarFormulario = useCallback(() => {
+    setImages([]);
+    setNombre("");
+    setDescripcion("");
+    setPrecio("");
+    setCantidad("");
+
+    setCategoriaId(null);
+    setSubcategoriaId(null);
+    setIntegridadId(null);
+
+    setCategoriaNombre("");
+    setSubcategoriaNombre("");
+    setIntegridadNombre("");
+
+    setSubcategorias([]);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      limpiarFormulario();
+    }, [limpiarFormulario])
+  );
+
   const normalizarArray = (json: any) => {
     if (Array.isArray(json)) return json;
     if (Array.isArray(json?.data)) return json.data;
@@ -81,19 +106,25 @@ const VenderScreen = () => {
 
   const formatearPesosCOP = (valor: string) => {
     const soloNumeros = limpiarNumero(valor);
-
     if (!soloNumeros) return "";
-
     return soloNumeros.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   const handleChangePrecio = (valor: string) => {
-    const formateado = formatearPesosCOP(valor);
-    setPrecio(formateado);
+    setPrecio(formatearPesosCOP(valor));
   };
 
   const handleChangeCantidad = (valor: string) => {
     setCantidad(limpiarNumero(valor));
+  };
+
+  const apiUrl = (path: string) => {
+    const base = API_BASE_URL.endsWith("/")
+      ? API_BASE_URL.slice(0, -1)
+      : API_BASE_URL;
+
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return `${base}${cleanPath}`;
   };
 
   const cargarCategorias = async () => {
@@ -107,7 +138,7 @@ const VenderScreen = () => {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/categorias`, {
+      const res = await fetch(apiUrl("/categorias"), {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -118,13 +149,32 @@ const VenderScreen = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", json?.message || "No se pudieron cargar las categorías.");
+        Alert.alert(
+          "Error",
+          json?.message || "No se pudieron cargar las categorías."
+        );
         setCategorias([]);
         return;
       }
 
       const data = normalizarArray(json);
-      setCategorias(data);
+
+      const categoriasNormalizadas: Categoria[] = data.map((item: any) => ({
+        id: Number(item.id),
+        nombre: String(item.nombre ?? ""),
+        subcategorias: Array.isArray(item.subcategorias)
+          ? item.subcategorias.map((sub: any) => ({
+              id: Number(sub.id),
+              nombre: String(sub.nombre ?? ""),
+              categoria_id:
+                sub.categoria_id !== undefined && sub.categoria_id !== null
+                  ? Number(sub.categoria_id)
+                  : undefined,
+            }))
+          : [],
+      }));
+
+      setCategorias(categoriasNormalizadas);
     } catch (error) {
       Alert.alert("Error", "No fue posible cargar las categorías.");
       setCategorias([]);
@@ -144,7 +194,7 @@ const VenderScreen = () => {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/integridad`, {
+      const res = await fetch(apiUrl("/integridades"), {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -155,13 +205,26 @@ const VenderScreen = () => {
       const json = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", json?.message || "No se pudieron cargar las integridades.");
+        Alert.alert(
+          "Error",
+          json?.message || "No se pudieron cargar las integridades."
+        );
         setIntegridades([]);
         return;
       }
 
       const data = normalizarArray(json);
-      setIntegridades(data);
+
+      const integridadesNormalizadas: Integridad[] = data.map((item: any) => ({
+        id: Number(item.id),
+        nombre: String(item.nombre ?? ""),
+        descripcion:
+          item.descripcion !== undefined && item.descripcion !== null
+            ? String(item.descripcion)
+            : null,
+      }));
+
+      setIntegridades(integridadesNormalizadas);
     } catch (error) {
       Alert.alert("Error", "No fue posible cargar las integridades.");
       setIntegridades([]);
@@ -179,11 +242,16 @@ const VenderScreen = () => {
 
     setSubcategoriaId(null);
     setSubcategoriaNombre("");
-    setSubcategorias(categoria.subcategorias || []);
+
+    setSubcategorias(
+      Array.isArray(categoria.subcategorias) ? categoria.subcategorias : []
+    );
   };
 
   const seleccionarSubcategoria = (nombreSubcategoria: string) => {
-    const subcategoria = subcategorias.find((s) => s.nombre === nombreSubcategoria);
+    const subcategoria = subcategorias.find(
+      (s) => s.nombre === nombreSubcategoria
+    );
     if (!subcategoria) return;
 
     setSubcategoriaNombre(subcategoria.nombre);
@@ -200,12 +268,14 @@ const VenderScreen = () => {
 
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
     if (status !== "granted") {
       Alert.alert("Permiso requerido", "Necesito acceso a tu galería.");
       return;
     }
 
     const remaining = 3 - images.length;
+
     if (remaining <= 0) {
       Alert.alert("Límite alcanzado", "Máximo 3 imágenes.");
       return;
@@ -238,7 +308,10 @@ const VenderScreen = () => {
       !subcategoriaId ||
       !integridadId
     ) {
-      Alert.alert("Campos requeridos", "Completa todos los campos obligatorios.");
+      Alert.alert(
+        "Campos requeridos",
+        "Completa todos los campos obligatorios."
+      );
       return;
     }
 
@@ -263,18 +336,21 @@ const VenderScreen = () => {
       formData.append("integridad_id", String(integridadId));
 
       images.forEach((uri, index) => {
-        formData.append("imagenes[]", {
-          uri,
-          name: `imagen_${index}.jpg`,
-          type: "image/jpeg",
-        } as any);
+        formData.append(
+          "imagenes[]",
+          {
+            uri,
+            name: `imagen_${index}.jpg`,
+            type: "image/jpeg",
+          } as any
+        );
       });
 
-      const res = await fetch(`${API_BASE_URL}/api/productos`, {
+      const res = await fetch(apiUrl("/productos"), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           Accept: "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
@@ -286,8 +362,14 @@ const VenderScreen = () => {
         return;
       }
 
-      Alert.alert("Éxito", "Producto publicado correctamente.");
-      router.back();
+      limpiarFormulario();
+
+      Alert.alert("Éxito", "Producto publicado correctamente.", [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
+      ]);
     } catch (error) {
       Alert.alert("Error", "No fue posible conectar con el servidor.");
     } finally {
@@ -295,12 +377,23 @@ const VenderScreen = () => {
     }
   };
 
-  const Box = ({ uri, index, isUpload }: any) => (
+  const Box = ({
+    uri,
+    index,
+    isUpload,
+  }: {
+    uri?: string;
+    index?: number;
+    isUpload?: boolean;
+  }) => (
     <Pressable onPress={isUpload ? pickImages : undefined} style={styles.box}>
       {uri ? (
         <>
           <Image source={{ uri }} style={styles.image} resizeMode="cover" />
-          <Pressable onPress={() => removeImage(index)} style={styles.removeBtn}>
+          <Pressable
+            onPress={() => typeof index === "number" && removeImage(index)}
+            style={styles.removeBtn}
+          >
             <Text style={styles.removeText}>×</Text>
           </Pressable>
         </>
@@ -320,7 +413,10 @@ const VenderScreen = () => {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["bottom"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#fff" }}
+      edges={["bottom"]}
+    >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -340,7 +436,11 @@ const VenderScreen = () => {
 
           <View className="m-4 rounded-xl border border-sextary-600 p-4 bg-white">
             <Text className="font-semibold mb-1">Nombre del Producto *</Text>
-            <CustomInput value={nombre} onChangeText={setNombre} className="border border-green-600"/>
+            <CustomInput
+              value={nombre}
+              onChangeText={setNombre}
+              className="border border-green-600"
+            />
 
             <Text className="font-semibold mb-1 mt-2">
               Descripción (max 185 caracteres) *
@@ -356,7 +456,7 @@ const VenderScreen = () => {
             />
 
             <View className="flex-row justify-between mt-3">
-              <View style={{ width: "48%"}}>
+              <View style={{ width: "48%" }}>
                 <Text className="font-semibold mb-1">Precio (COP) *</Text>
                 <CustomInput
                   type="text"
@@ -381,6 +481,7 @@ const VenderScreen = () => {
 
             <Text className="font-semibold mb-1 mt-3">Categoría *</Text>
             <CustomButton
+              value={categoriaNombre}
               variant="desplegar"
               options={categorias.map((c) => c.nombre)}
               placeholder={
@@ -390,11 +491,14 @@ const VenderScreen = () => {
               }
               onSelect={seleccionarCategoria}
             >
-              {categoriaNombre || "Seleccione categoría"}
+              {loadingCategorias
+                ? "Cargando categorías..."
+                : categoriaNombre || "Seleccione categoría"}
             </CustomButton>
 
             <Text className="font-semibold mb-1 mt-3">Subcategoría *</Text>
             <CustomButton
+              value={subcategoriaNombre}
               variant="desplegar"
               options={subcategorias.map((s) => s.nombre)}
               placeholder={
@@ -411,20 +515,27 @@ const VenderScreen = () => {
 
             <Text className="font-semibold mb-1 mt-3">Integridad *</Text>
             <CustomButton
+              value={integridadNombre}
               variant="desplegar"
               options={integridades.map((i) => i.nombre)}
               placeholder={
                 loadingIntegridades
-                  ? "Cargando integridad..."
+                  ? "Cargando integridades..."
                   : integridadNombre || "Seleccione integridad"
               }
               onSelect={seleccionarIntegridad}
             >
-              {integridadNombre || "Seleccione integridad"}
+              {loadingIntegridades
+                ? "Cargando integridades..."
+                : integridadNombre || "Seleccione integridad"}
             </CustomButton>
 
-            <Text className="font-semibold text-center mt-4">Imagen del producto</Text>
-            <Text className="text-center text-gray-400 text-sm mb-3">Máximo 3</Text>
+            <Text className="font-semibold text-center mt-4">
+              Imagen del producto
+            </Text>
+            <Text className="text-center text-gray-400 text-sm mb-3">
+              Máximo 3
+            </Text>
 
             <View style={styles.grid}>
               <Box isUpload />
@@ -438,6 +549,7 @@ const VenderScreen = () => {
               className="rounded-l-full rounded-r-full py-4"
               color="sextary"
               onPress={handlePublicar}
+              disabled={loading}
             >
               <Text className="text-white text-lg text-center">
                 {loading ? "Publicando..." : "Publicar Producto"}
@@ -447,7 +559,11 @@ const VenderScreen = () => {
             <CustomButton
               variant="contained"
               className="bg-red-600 rounded-l-full rounded-r-full py-4 mt-3"
-              onPress={() => router.back()}
+              onPress={() => {
+                limpiarFormulario();
+                router.back();
+              }}
+              disabled={loading}
             >
               <Text className="text-white text-lg text-center">Cancelar</Text>
             </CustomButton>
@@ -468,6 +584,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#e5e7eb",
+    overflow: "visible",
   },
   image: {
     width: "100%",
@@ -484,11 +601,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 10,
   },
   removeText: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "bold",
+    lineHeight: 22,
   },
   placeholder: {
     justifyContent: "center",
@@ -498,6 +617,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6b7280",
     fontWeight: "600",
+    textAlign: "center",
   },
   counter: {
     fontSize: 10,
@@ -517,6 +637,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#1f2937",
     minHeight: 80,
+    textAlignVertical: "top",
   },
   grid: {
     flexDirection: "row",

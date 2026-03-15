@@ -1,19 +1,34 @@
 import { AntDesign } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import React, { useState } from 'react';
-import { Image, ImageSourcePropType, Pressable, PressableProps, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  PressableProps,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 interface Props extends PressableProps {
   children?: React.ReactNode;
   color?: 'primary' | 'secondary' | 'tertiary' | 'quaternary' | 'quinary' | 'sextary' | 'gray';
   className?: string;
-  variant?: 'contained' | 'text-only' | 'card' | 'icon-only' | 'desplegar' | 'card-center' | 'chat-card' | 'chat-bubble'|'chat-input';
+  variant?:
+    | 'contained'
+    | 'text-only'
+    | 'card'
+    | 'icon-only'
+    | 'desplegar'
+    | 'card-center'
+    | 'chat-card'
+    | 'chat-bubble'
+    | 'chat-input';
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right' | 'up' | 'down' | 'center';
-  // source?: {};
   price?: string;
   FontText?: string;
-  // defaultImage?: any;
   onCartPress?: () => void;
   actionText?: string;
   underline?: boolean;
@@ -26,11 +41,12 @@ interface Props extends PressableProps {
   source?: ImageSourcePropType;
   defaultImage?: ImageSourcePropType;
 
-  // NUEVOS (opcionales) para responsividad sin romper nada
-  imageAspectRatio?: number; // para variant="card"
-  minCardHeight?: number;    // para variant="card-center"
-  // ponido por jean
+  imageAspectRatio?: number;
+  minCardHeight?: number;
   onSendMessage?: (message: string) => void;
+
+  // NUEVO: valor controlado opcional
+  value?: string;
 }
 
 const CustomButton = React.forwardRef<View, Props>(
@@ -54,29 +70,29 @@ const CustomButton = React.forwardRef<View, Props>(
       underline,
       showFavorite,
       isOwner = false,
-      // jeancito toco esto
       options = [],
-      placeholder = "Selecciona...",
+      placeholder = 'Selecciona...',
       onSelect,
       onSendMessage,
       style,
-
-      // defaults seguros
       imageAspectRatio = 16 / 9,
       minCardHeight = 120,
-
+      value,
       ...rest
-      
     },
     ref
   ) => {
-
     const [isFavorite, setIsFavorite] = React.useState(false);
-    // jeancito tambien toco aqui
     const [showOptions, setShowOptions] = useState(false);
-    const [selected, setSelected] = useState("");
+    const [selected, setSelected] = useState('');
     const [inputMessage, setInputMessage] = useState('');
 
+    // Sincroniza el estado interno con el valor externo
+    useEffect(() => {
+      if (variant === 'desplegar') {
+        setSelected(value ?? '');
+      }
+    }, [value, variant]);
 
     const textColor = {
       primary: 'text-primary-90',
@@ -85,7 +101,7 @@ const CustomButton = React.forwardRef<View, Props>(
       quaternary: 'text-quaternary-50',
       quinary: 'text-quinary-50',
       sextary: 'text-sextary-900',
-      gray: 'text-gray'
+      gray: 'text-gray',
     }[color];
 
     const btnColor = {
@@ -95,7 +111,7 @@ const CustomButton = React.forwardRef<View, Props>(
       quaternary: 'bg-quaternary-700',
       quinary: 'bg-quinary-600',
       sextary: 'bg-sextary-400',
-      gray: 'bg-gray-100'
+      gray: 'bg-gray-100',
     }[color];
 
     const textOnlyColor = {
@@ -105,19 +121,21 @@ const CustomButton = React.forwardRef<View, Props>(
       quaternary: 'text-quaternary-600',
       quinary: 'text-quinary-600',
       sextary: 'text-sextary-90',
-      gray: 'text-gray'
+      gray: 'text-gray',
     }[color];
 
-    // Estructura visual para texto + icono
     const Content = () => {
-      // para el texto "normal" (no card)
-      const effectiveTextColor = variant === 'text-only' ? textOnlyColor : textColor;
+      const effectiveTextColor =
+        variant === 'text-only' ? textOnlyColor : textColor;
 
       if (variant === 'card' && price) {
         return (
           <>
             <View className="flex-row items-center justify-center">
-              <Text numberOfLines={2} className={`text-center w-full ${textColor} ${FontText}`}>
+              <Text
+                numberOfLines={2}
+                className={`text-center w-full ${textColor} ${FontText}`}
+              >
                 {children}
               </Text>
             </View>
@@ -148,17 +166,18 @@ const CustomButton = React.forwardRef<View, Props>(
         </View>
       );
     };
-      const openCamera = async () => {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-          if (!permission.granted) return;
 
-          const result = await ImagePicker.launchCameraAsync({
-            quality: 0.7,
-          });
+    const openCamera = async () => {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return;
 
-          if (!result.canceled) {
-            console.log('Imagen cámara:', result.assets[0].uri);
-          }
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.7,
+      });
+
+      if (!result.canceled) {
+        console.log('Imagen cámara:', result.assets[0].uri);
+      }
     };
 
     const openGallery = async () => {
@@ -172,7 +191,6 @@ const CustomButton = React.forwardRef<View, Props>(
       }
     };
 
-    // Mismo if que tú usabas
     if (variant === 'text-only') {
       return (
         <Pressable
@@ -198,27 +216,21 @@ const CustomButton = React.forwardRef<View, Props>(
         >
           <Image
             resizeMode="cover"
-            // antes: height: 150 (fijo)
-            // ahora: aspectRatio responsivo (default 16/9)
             style={{
               width: '100%',
               height: 150,
               overflow: 'hidden',
-              // aspectRatio: imageAspectRatio,
               borderRadius: 8,
               marginBottom: 8,
-              // overflow: "hidden",
             }}
             source={
-              typeof source === "string"
-              ? { uri: source }
-              : source || defaultImage
+              typeof source === 'string'
+                ? { uri: source }
+                : source || defaultImage
             }
           />
 
           <Content />
-
-          {/* Tu bloque comentado se mantiene igual */}
         </Pressable>
       );
     } else if (variant === 'card-center') {
@@ -231,18 +243,21 @@ const CustomButton = React.forwardRef<View, Props>(
           style={style}
           {...rest}
         >
-          {/* antes: h-[150px] fijo */}
-          {/* ahora: minHeight configurable */}
-          <View style={{ minHeight: minCardHeight }} className="items-center justify-center">
+          <View
+            style={{ minHeight: minCardHeight }}
+            className="items-center justify-center"
+          >
             <Text
-              className={`text-center ${textColor} ${FontText ?? ""} ${underline ? "underline" : ""}`}
+              className={`text-center ${textColor} ${FontText ?? ''} ${
+                underline ? 'underline' : ''
+              }`}
             >
               {children}
             </Text>
           </View>
         </Pressable>
       );
-    }else if (variant === 'icon-only') {
+    } else if (variant === 'icon-only') {
       return (
         <Pressable
           ref={ref}
@@ -252,13 +267,12 @@ const CustomButton = React.forwardRef<View, Props>(
           style={style}
           {...rest}
         >
-          <View className={`flex items-center justify-center`}>
-            {icon}
-          </View>
+          <View className="flex items-center justify-center">{icon}</View>
         </Pressable>
       );
     } else if (variant === 'desplegar') {
-      // jeancito tambien t toco esto aqui
+      const textoMostrado = selected || value || placeholder;
+
       return (
         <View className="w-full">
           <Pressable
@@ -269,9 +283,13 @@ const CustomButton = React.forwardRef<View, Props>(
           >
             <View className="flex-row items-center justify-between">
               <Text className="text-black text-lg font-semibold">
-                {selected || placeholder}
+                {textoMostrado}
               </Text>
-              <AntDesign name={showOptions ? "up" : "down"} size={18} color="black" />
+              <AntDesign
+                name={showOptions ? 'up' : 'down'}
+                size={18}
+                color="black"
+              />
             </View>
           </Pressable>
 
@@ -279,7 +297,7 @@ const CustomButton = React.forwardRef<View, Props>(
             <View className="bg-gray mt-1 rounded-lg border border-black-500 p-2">
               {options.map((item, index) => (
                 <Pressable
-                  key={index}
+                  key={`${item}-${index}`}
                   onPress={() => {
                     setSelected(item);
                     setShowOptions(false);
@@ -294,7 +312,7 @@ const CustomButton = React.forwardRef<View, Props>(
           )}
         </View>
       );
-    }else if (variant === 'chat-card') {
+    } else if (variant === 'chat-card') {
       return (
         <Pressable
           ref={ref}
@@ -313,12 +331,10 @@ const CustomButton = React.forwardRef<View, Props>(
           style={style}
           {...rest}
         >
-          {/* Avatar */}
           <View className="w-12 h-12 rounded-full border-2 border-sextary-600 items-center justify-center mr-3">
             <AntDesign name="user" size={26} color="#2FBF2F" />
           </View>
 
-          {/* Texto */}
           <View className="flex-1">
             <Text className="font-semibold text-black text-base">
               {children}
@@ -330,87 +346,77 @@ const CustomButton = React.forwardRef<View, Props>(
               </Text>
             )}
           </View>
-
-          {/* Punto rojo */}
-          {/* <View className="w-3 h-3 bg-red-500 rounded-full ml-2" /> */}
         </Pressable>
       );
-    }else if (variant === "chat-bubble") {
-  return (
-    <Pressable
-      ref={ref}
-      onPress={onPress}
-      onLongPress={onLongPress}
-      {...rest}
-    >
-      <View
-        style={{
-          alignSelf: isOwner ? "flex-end" : "flex-start",
-          backgroundColor: isOwner ? "#D0F0C0" : "#E0E0E0",
-          padding: 10,
-          borderRadius: 12,
-          maxWidth: "70%",
-          marginVertical: 4,
-        }}
-      >
-        <Text style={{ color: "#000", fontSize: 15 }}>
-          {message ?? children}
-        </Text>
-      </View>
-    </Pressable>
-  );
-} else if (variant === 'chat-input') {
-  return (
-    <View
-      className="
-        flex-row items-center
-        px-3 py-2
-        border-t border-gray-300
-        bg-white
-      "
-    >
-      {/* Cámara */}
-      <Pressable onPress={openCamera} className="p-2">
-        <AntDesign name="camera" size={22} color="#2FBF2F" />
-      </Pressable>
+    } else if (variant === 'chat-bubble') {
+      return (
+        <Pressable
+          ref={ref}
+          onPress={onPress}
+          onLongPress={onLongPress}
+          {...rest}
+        >
+          <View
+            style={{
+              alignSelf: isOwner ? 'flex-end' : 'flex-start',
+              backgroundColor: isOwner ? '#D0F0C0' : '#E0E0E0',
+              padding: 10,
+              borderRadius: 12,
+              maxWidth: '70%',
+              marginVertical: 4,
+            }}
+          >
+            <Text style={{ color: '#000', fontSize: 15 }}>
+              {message ?? children}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    } else if (variant === 'chat-input') {
+      return (
+        <View
+          className="
+            flex-row items-center
+            px-3 py-2
+            border-t border-gray-300
+            bg-white
+          "
+        >
+          <Pressable onPress={openCamera} className="p-2">
+            <AntDesign name="camera" size={22} color="#2FBF2F" />
+          </Pressable>
 
-      {/* Galería */}
-      <Pressable onPress={openGallery} className="p-2">
-        <AntDesign name="picture" size={22} color="#2FBF2F" />
-      </Pressable>
+          <Pressable onPress={openGallery} className="p-2">
+            <AntDesign name="picture" size={22} color="#2FBF2F" />
+          </Pressable>
 
-      {/* Input */}
-      <TextInput
-        value={inputMessage}
-        onChangeText={setInputMessage}
-        placeholder="Escribe un mensaje..."
-        className="
-          flex-1
-          bg-gray-100
-          rounded-full
-          px-4 py-2
-          mx-2
-          text-base
-        "
-      />
+          <TextInput
+            value={inputMessage}
+            onChangeText={setInputMessage}
+            placeholder="Escribe un mensaje..."
+            className="
+              flex-1
+              bg-gray-100
+              rounded-full
+              px-4 py-2
+              mx-2
+              text-base
+            "
+          />
 
-      {/* Enviar */}
-      <Pressable
-        onPress={() => {
-          if (!inputMessage.trim()) return;
-          onSendMessage?.(inputMessage);
-          setInputMessage('');
-        }}
-        className="p-2"
-      >
-        <AntDesign name="arrow-up" size={22} color="#2FBF2F" />
-      </Pressable>
-    </View>
-  );
-}
-
-
-
+          <Pressable
+            onPress={() => {
+              if (!inputMessage.trim()) return;
+              onSendMessage?.(inputMessage);
+              setInputMessage('');
+            }}
+            className="p-2"
+          >
+            <AntDesign name="arrow-up" size={22} color="#2FBF2F" />
+          </Pressable>
+        </View>
+      );
+    }
 
     return (
       <Pressable
