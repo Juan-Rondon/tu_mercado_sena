@@ -1,3 +1,4 @@
+import { useAppTheme } from "@/src/theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useRef, useState } from "react";
 import {
@@ -20,9 +21,7 @@ interface Props extends Omit<TextInputProps, "onChangeText" | "value"> {
   onChangeText?: (text: string) => void;
   icon?: React.ReactNode;
   showPasswordToggle?: boolean;
-
   containerStyle?: StyleProp<ViewStyle>;
-
   containerClassName?: string;
 }
 
@@ -33,12 +32,14 @@ const CustomInput = ({
   containerStyle,
   placeholder,
   value = "",
-  placeholderTextColor = "#CDCDCD",
+  placeholderTextColor,
   onChangeText,
   icon,
   showPasswordToggle = true,
   ...rest
 }: Props) => {
+  const { colors, isDark } = useAppTheme();
+
   const isPassword = type === "password";
   const isNumber = type === "number";
   const isEmail = type === "email";
@@ -66,7 +67,6 @@ const CustomInput = ({
     if (Platform.OS === "ios" && isPassword) {
       const prev = lastGoodValueRef.current;
 
-      // Fix de backspace iOS (bug conocido en secureTextEntry)
       if (t === "" && prev.length > 1 && lastKeyRef.current === "Backspace") {
         const fixed = prev.slice(0, -1);
 
@@ -88,12 +88,21 @@ const CustomInput = ({
 
   return (
     <View
-      className={`flex-row items-center rounded-full bg-[#F5F5F7] px-4 ${
-        className ?? ""
-      } ${containerClassName ?? ""}`}
-      style={containerStyle}
+      className={`flex-row items-center rounded-full px-4 ${className ?? ""} ${containerClassName ?? ""}`}
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDark
+            ? colors.surface ?? "#1E1E1E"
+            : colors.surface ?? "#F5F5F7",
+          borderColor: isDark
+            ? colors.border ?? "#3A3A3C"
+            : colors.border ?? "#D9D9D9",
+        },
+        containerStyle,
+      ]}
     >
-      {icon && <View className="mr-2">{icon}</View>}
+      {icon && <View style={styles.iconContainer}>{icon}</View>}
 
       <TextInput
         ref={inputRef}
@@ -101,17 +110,24 @@ const CustomInput = ({
         onKeyPress={handleKeyPress}
         onChangeText={handleChangeText}
         placeholder={placeholder}
-        placeholderTextColor={placeholderTextColor}
+        placeholderTextColor={placeholderTextColor ?? colors.textMuted ?? (isDark ? "#A1A1AA" : "#6B7280")}
         secureTextEntry={isPassword ? !showPassword : false}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
         spellCheck={false}
+        cursorColor={colors.primary ?? "#2563EB"}
+        selectionColor={colors.primary ?? "#2563EB"}
         textContentType={
           isPassword ? "none" : isEmail ? "emailAddress" : rest.textContentType
         }
         autoComplete={isPassword ? "off" : isEmail ? "email" : rest.autoComplete}
-        style={styles.input}
+        style={[
+          styles.input,
+          {
+            color: colors.text ?? (isDark ? "#FFFFFF" : "#111827"),
+          },
+        ]}
         {...rest}
       />
 
@@ -124,7 +140,7 @@ const CustomInput = ({
           <Ionicons
             name={showPassword ? "eye-outline" : "eye-off-outline"}
             size={20}
-            color="#9CA3AF"
+            color={colors.textMuted ?? (isDark ? "#A1A1AA" : "#6B7280")}
           />
         </Pressable>
       )}
@@ -133,8 +149,22 @@ const CustomInput = ({
 };
 
 const styles = StyleSheet.create({
-  input: { flex: 1, fontSize: 16, color: "#1a202a", paddingVertical: 12 },
-  eyeBtn: { paddingLeft: 10, paddingVertical: 6 },
+  container: {
+    borderWidth: 1,
+    minHeight: 52,
+  },
+  iconContainer: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 12,
+  },
+  eyeBtn: {
+    paddingLeft: 10,
+    paddingVertical: 6,
+  },
 });
 
 export default CustomInput;

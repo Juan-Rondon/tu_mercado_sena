@@ -1,5 +1,6 @@
 import CustomButton from "@/components/buttons/CustomButton";
 import { getToken } from "@/src/lib/authToken";
+import { useAppTheme } from "@/src/theme/ThemeProvider";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -26,9 +27,6 @@ const defaultUserImage = require("../../assets/images/default_user.png");
 const API_BASE_URL = "https://tumercadosena.shop/api";
 const API_HOST = "https://tumercadosena.shop";
 
-/**
- * Ajusta este valor al estado que tu backend use para "eliminado" o "inactivo".
- */
 const ESTADO_ELIMINADO_ID = 3;
 
 type UsuarioPerfil = {
@@ -49,6 +47,7 @@ type Producto = {
 
 const ProfileScreen = () => {
   const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { colors } = useAppTheme();
 
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -426,10 +425,10 @@ const ProfileScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color="#57D657" />
-          <Text style={{ marginTop: 12, color: "#6b7280" }}>Cargando perfil...</Text>
+          <ActivityIndicator size="large" color={colors.success} />
+          <Text style={{ marginTop: 12, color: colors.textMuted }}>Cargando perfil...</Text>
         </View>
       </SafeAreaView>
     );
@@ -437,7 +436,7 @@ const ProfileScreen = () => {
 
   return (
     <>
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "bottom"]}>
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: 16,
@@ -445,7 +444,7 @@ const ProfileScreen = () => {
             paddingBottom: 24 + insets.bottom,
           }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
           <View style={{ marginBottom: 8, alignItems: "flex-start" }}>
             <CustomButton
@@ -453,14 +452,17 @@ const ProfileScreen = () => {
               color="secondary"
               FontText="text-xl"
               onPress={() => router.back()}
-              icon={<Ionicons name="arrow-back" size={20} color="#1C65E3" />}
+              icon={<Ionicons name="arrow-back" size={20} color={colors.primary} />}
               iconPosition="left"
             >
               Volver
             </CustomButton>
           </View>
 
-          <Text className="text-center font-Opensans-bold" style={{ fontSize: 18, marginTop: 6 }}>
+          <Text
+            className="text-center font-Opensans-bold"
+            style={{ fontSize: 18, marginTop: 6, color: colors.text }}
+          >
             {esMiPerfil ? "TU PERFIL" : "PERFIL DEL VENDEDOR"}
           </Text>
 
@@ -471,10 +473,12 @@ const ProfileScreen = () => {
                   width: avatarBox.size,
                   height: avatarBox.size,
                   borderRadius: avatarBox.size / 2,
-                  backgroundColor: "#CDCDCD",
+                  backgroundColor: colors.surface,
                   justifyContent: "center",
                   alignItems: "center",
                   overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
               >
                 {perfil?.foto_url ? (
@@ -495,13 +499,13 @@ const ProfileScreen = () => {
 
             <Text
               className="font-Opensans-medium text-center w-full"
-              style={{ marginTop: 14, fontSize: 18 }}
+              style={{ marginTop: 14, fontSize: 18, color: colors.text }}
             >
               {perfil?.nombre || "Usuario"}
             </Text>
 
             <View style={{ width: "75%", marginTop: 18 }}>
-              <Text className="text-center text-gray-600 leading-6">
+              <Text style={{ color: colors.textMuted }} className="text-center leading-6">
                 {perfil?.descripcion?.trim()
                   ? perfil.descripcion
                   : "Este usuario aún no ha agregado una descripción."}
@@ -520,21 +524,23 @@ const ProfileScreen = () => {
                     style={{
                       flexDirection: "row",
                       alignItems: "center",
-                      backgroundColor: "#f5f5f5",
+                      backgroundColor: colors.card,
                       paddingVertical: 8,
                       paddingHorizontal: 14,
                       borderRadius: 20,
                       maxWidth: "100%",
+                      borderWidth: 1,
+                      borderColor: colors.border,
                     }}
                   >
-                    <Ionicons name="link-outline" size={16} color="#444" />
+                    <Ionicons name="link-outline" size={16} color={colors.textMuted} />
                     <Text
                       onPress={abrirRedSocial}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                       style={{
                         marginLeft: 6,
-                        color: "#111",
+                        color: colors.text,
                         fontSize: 14,
                         fontWeight: "500",
                         maxWidth: 220,
@@ -587,7 +593,7 @@ const ProfileScreen = () => {
                 <View style={{ marginTop: 18 }}>
                   <Pressable
                     style={{
-                      backgroundColor: "#16a34a",
+                      backgroundColor: colors.success,
                       paddingVertical: 14,
                       borderRadius: 14,
                     }}
@@ -595,7 +601,7 @@ const ProfileScreen = () => {
                   >
                     <Text
                       style={{
-                        color: "white",
+                        color: "#FFFFFF",
                         textAlign: "center",
                         fontSize: 16,
                         fontWeight: "600",
@@ -612,18 +618,21 @@ const ProfileScreen = () => {
           <View
             style={{
               height: 1,
-              backgroundColor: "#d1d5db",
+              backgroundColor: colors.border,
               marginVertical: 22,
               width: "100%",
             }}
           />
 
-          <Text className="text-center font-Opensans-bold" style={{ fontSize: 16, marginBottom: 8 }}>
+          <Text
+            className="text-center font-Opensans-bold"
+            style={{ fontSize: 16, marginBottom: 8, color: colors.text }}
+          >
             {esMiPerfil ? "Mis productos" : "Productos publicados"}
           </Text>
 
           {productos.length === 0 ? (
-            <Text style={{ textAlign: "center", color: "#6b7280", marginTop: 12 }}>
+            <Text style={{ textAlign: "center", color: colors.textMuted, marginTop: 12 }}>
               {esMiPerfil
                 ? "Aún no has publicado productos."
                 : "Este usuario aún no tiene productos publicados."}

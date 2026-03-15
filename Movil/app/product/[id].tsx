@@ -1,5 +1,6 @@
 import CustomButton from "@/components/buttons/CustomButton";
 import { getToken } from "@/src/lib/authToken";
+import { useAppTheme } from "@/src/theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -56,6 +57,7 @@ type RelatedItem = {
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { colors, isDark } = useAppTheme();
 
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -288,23 +290,29 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator />
-        <Text style={{ marginTop: 10 }}>Cargando producto...</Text>
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ marginTop: 10, color: colors.textMuted }}>
+            Cargando producto...
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!product) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>No se pudo cargar el producto</Text>
-      </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: colors.text }}>No se pudo cargar el producto</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "bottom"]}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -319,7 +327,7 @@ export default function ProductDetail() {
             color="secondary"
             FontText="text-xl"
             onPress={() => router.back()}
-            icon={<Ionicons name="arrow-back" size={20} color="#1C65E3" />}
+            icon={<Ionicons name="arrow-back" size={20} color={colors.primary} />}
             iconPosition="left"
           >
             Volver
@@ -347,7 +355,7 @@ export default function ProductDetail() {
                     height: imageHeight,
                     borderRadius: 16,
                     marginRight: 12,
-                    backgroundColor: "#f3f4f6",
+                    backgroundColor: colors.surface,
                   }}
                   resizeMode="cover"
                 />
@@ -357,21 +365,36 @@ export default function ProductDetail() {
         )}
 
         <View style={{ paddingTop: 16 }}>
-          <Text className="text-2xl font-bold mb-2">{product.name}</Text>
+          <Text
+            style={{ color: colors.text }}
+            className="text-2xl font-bold mb-2"
+          >
+            {product.name}
+          </Text>
 
-          <Text className="text-xl text-gray-700">{product.price}</Text>
+          <Text style={{ color: colors.textMuted }} className="text-xl">
+            {product.price}
+          </Text>
 
-          <Text className="mt-4 text-lg font-semibold text-gray-800">
+          <Text
+            style={{ color: colors.text }}
+            className="mt-4 text-lg font-semibold"
+          >
             Descripción del producto
           </Text>
 
-          <Text className="mt-1 text-base text-gray-600">
+          <Text
+            style={{ color: colors.textMuted }}
+            className="mt-1 text-base"
+          >
             {product.description?.trim()
               ? product.description
               : "Este producto no tiene descripción."}
           </Text>
 
-          <Text className="mt-5 text-gray-600">Vendido por:</Text>
+          <Text style={{ color: colors.textMuted }} className="mt-5">
+            Vendido por:
+          </Text>
 
           <Pressable
             onPress={irAlPerfilVendedor}
@@ -379,9 +402,9 @@ export default function ProductDetail() {
               marginTop: 10,
               flexDirection: "row",
               alignItems: "center",
-              backgroundColor: "#F9FAFB",
+              backgroundColor: colors.card,
               borderWidth: 1,
-              borderColor: "#E5E7EB",
+              borderColor: colors.border,
               borderRadius: 16,
               paddingHorizontal: 14,
               paddingVertical: 12,
@@ -394,28 +417,28 @@ export default function ProductDetail() {
                 width: 56,
                 height: 56,
                 borderRadius: 28,
-                backgroundColor: "#E5E7EB",
+                backgroundColor: colors.surface,
               }}
               resizeMode="cover"
             />
 
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ fontSize: 17, fontWeight: "600", color: "#111827" }}>
+              <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>
                 {product.seller}
               </Text>
-              <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>
+              <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 2 }}>
                 Ver perfil del vendedor
               </Text>
             </View>
 
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
           </Pressable>
 
           {product.isOwner ? (
             <Pressable
               style={{
                 marginTop: 18,
-                backgroundColor: "#1C65E3",
+                backgroundColor: colors.primary,
                 paddingVertical: 14,
                 borderRadius: 14,
               }}
@@ -423,7 +446,7 @@ export default function ProductDetail() {
             >
               <Text
                 style={{
-                  color: "white",
+                  color: "#FFFFFF",
                   textAlign: "center",
                   fontSize: 18,
                   fontWeight: "600",
@@ -436,7 +459,7 @@ export default function ProductDetail() {
             <Pressable
               style={{
                 marginTop: 18,
-                backgroundColor: "#16a34a",
+                backgroundColor: colors.success,
                 paddingVertical: 14,
                 borderRadius: 14,
               }}
@@ -444,7 +467,7 @@ export default function ProductDetail() {
             >
               <Text
                 style={{
-                  color: "white",
+                  color: "#FFFFFF",
                   textAlign: "center",
                   fontSize: 18,
                   fontWeight: "600",
@@ -456,12 +479,15 @@ export default function ProductDetail() {
           )}
         </View>
 
-        <Text className="text-xl font-bold mb-3" style={{ marginTop: 24 }}>
+        <Text
+          style={{ color: colors.text }}
+          className="text-xl font-bold mb-3 mt-8"
+        >
           Productos que quizás te interesen
         </Text>
 
         {relatedProducts.length === 0 ? (
-          <Text style={{ color: "#6B7280" }}>
+          <Text style={{ color: colors.textMuted }}>
             No hay productos de otros usuarios para mostrar.
           </Text>
         ) : (

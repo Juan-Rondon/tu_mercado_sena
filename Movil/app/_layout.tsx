@@ -1,17 +1,17 @@
+import { ThemeProvider, useAppTheme } from "@/src/theme/ThemeProvider";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { View, useColorScheme } from "react-native";
+import { View } from "react-native";
 import SplashAnimated from "../components/splash/SplashAnimated";
 import "./global.css";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+function RootNavigator() {
+  const { isDark, colors } = useAppTheme();
 
   const [fontsLoaded, fontError] = useFonts({
     "OpenSans-Bold": require("../assets/fonts/OpenSans-Bold.ttf"),
@@ -45,7 +45,7 @@ export default function RootLayout() {
     <View
       style={{
         flex: 1,
-        backgroundColor: isDark ? "#0B0F14" : "#FFFFFF",
+        backgroundColor: colors.background,
       }}
     >
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -61,5 +61,13 @@ export default function RootLayout() {
         <SplashAnimated onFinish={() => setShowAnimatedSplash(false)} />
       )}
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootNavigator />
+    </ThemeProvider>
   );
 }
