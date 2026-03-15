@@ -13,6 +13,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   Text,
   View,
   useWindowDimensions,
@@ -24,6 +25,11 @@ const defaultUserImage = require("../../assets/images/default_user.png");
 
 const API_BASE_URL = "https://tumercadosena.shop/api";
 const API_HOST = "https://tumercadosena.shop";
+
+/**
+ * Ajusta este valor al estado que tu backend use para "eliminado" o "inactivo".
+ */
+const ESTADO_ELIMINADO_ID = 2;
 
 type UsuarioPerfil = {
   id: number;
@@ -50,6 +56,7 @@ const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [mostrarImagenPerfil, setMostrarImagenPerfil] = useState(false);
+  const [productoAccionandoId, setProductoAccionandoId] = useState<number | null>(null);
 
   const avatarBox = useMemo(() => {
     const size = Math.max(130, Math.min(150, width * 0.38));
@@ -77,54 +84,40 @@ const ProfileScreen = () => {
   };
 
   const normalizarUrlImagen = (url?: string | null) => {
-    console.log("normalizarUrlImagen - entrada:", url);
-
-    if (!url) {
-      console.log("normalizarUrlImagen - salida:", null);
-      return null;
-    }
+    if (!url) return null;
 
     const limpio = url.trim();
-    if (!limpio) {
-      console.log("normalizarUrlImagen - salida:", null);
-      return null;
-    }
+    if (!limpio) return null;
 
     if (
       limpio.includes("/tmp/php") ||
       limpio.startsWith("/tmp/") ||
       limpio.startsWith("tmp/")
     ) {
-      console.log("normalizarUrlImagen - ruta temporal detectada, salida:", null);
       return null;
     }
 
     if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
-      console.log("normalizarUrlImagen - salida:", limpio);
       return limpio;
     }
 
     if (limpio.startsWith("/storage/")) {
-      const salida = `${API_HOST}${limpio}`;
-      console.log("normalizarUrlImagen - salida:", salida);
-      return salida;
+      return `${API_HOST}${limpio}`;
     }
 
     if (limpio.startsWith("storage/")) {
-      const salida = `${API_HOST}/${limpio}`;
-      console.log("normalizarUrlImagen - salida:", salida);
-      return salida;
+      return `${API_HOST}/${limpio}`;
     }
 
     if (limpio.startsWith("/")) {
-      const salida = `${API_HOST}${limpio}`;
-      console.log("normalizarUrlImagen - salida:", salida);
-      return salida;
+      return `${API_HOST}${limpio}`;
     }
 
-    const salida = `${API_HOST}/${limpio}`;
-    console.log("normalizarUrlImagen - salida:", salida);
-    return salida;
+    if (limpio.startsWith("usuarios/")) {
+      return `${API_HOST}/storage/${limpio}`;
+    }
+
+    return `${API_HOST}/${limpio}`;
   };
 
   const mostrarLink = (url?: string | null) => {
@@ -155,25 +148,44 @@ const ProfileScreen = () => {
     await Linking.openURL(url);
   };
 
+  const compartirPerfil = async () => {
+  try {
+    if (!perfil?.id) {
+      Alert.alert("Perfil", "No fue posible generar el enlace del perfil.");
+      return;
+    }
+
+    const nombre = perfil?.nombre?.trim() || "Usuario";
+    const perfilUrl = `${API_HOST}/perfil/${perfil.id}`;
+
+    const mensaje = `Mira el perfil de ${nombre} en Tu Mercado SENA:\n${perfilUrl}`;
+
+    await Share.share(
+      {
+        title: `Perfil de ${nombre}`,
+        message: mensaje,
+      },
+      {
+        dialogTitle: `Compartir perfil de ${nombre}`,
+        subject: `Perfil de ${nombre}`,
+      }
+    );
+  } catch (error) {
+    Alert.alert("Error", "No fue posible abrir las opciones para compartir.");
+  }
+};
+
   const abrirImagenPerfil = () => {
-    console.log("Tap en imagen de perfil");
-    console.log("URL actual imagen perfil:", perfil?.foto_url);
-    console.log("¿Tiene foto real?:", !!perfil?.foto_url);
     setMostrarImagenPerfil(true);
   };
 
   const cerrarImagenPerfil = () => {
-    console.log("Cerrar modal imagen perfil");
     setMostrarImagenPerfil(false);
   };
 
   const cargarPerfilYProductos = useCallback(async () => {
     try {
       const token = await getToken();
-
-      console.log("========== DEBUG TOKEN PERFIL ==========");
-      console.log("Token encontrado:", !!token);
-      console.log("=======================================");
 
       if (!token) {
         Alert.alert("Sesión", "No se encontró el token del usuario.");
@@ -190,16 +202,7 @@ const ProfileScreen = () => {
         },
       });
 
-      console.log("========== DEBUG RESPUESTA PERFIL ==========");
-      console.log("Status perfil:", perfilResponse.status);
-      console.log("OK perfil:", perfilResponse.ok);
-      console.log("===========================================");
-
       const perfilData = await perfilResponse.json().catch(() => null);
-
-      console.log("========== DEBUG IMAGEN PERFIL ==========");
-      console.log("perfilData completo:", JSON.stringify(perfilData, null, 2));
-      console.log("=========================================");
 
       if (!perfilResponse.ok) {
         throw new Error(perfilData?.message || "No se pudo cargar el perfil.");
@@ -215,11 +218,6 @@ const ProfileScreen = () => {
         perfilData?.data?.foto ??
         perfilData?.foto ??
         null;
-
-      const fotoNormalizada = normalizarUrlImagen(fotoOriginal);
-
-      console.log("foto original backend:", fotoOriginal);
-      console.log("foto normalizada:", fotoNormalizada);
 
       const usuario: UsuarioPerfil = {
         id: perfilData?.data?.id ?? perfilData?.id,
@@ -239,10 +237,8 @@ const ProfileScreen = () => {
           perfilData?.data?.red_social ??
           perfilData?.red_social ??
           null,
-        foto_url: fotoNormalizada,
+        foto_url: normalizarUrlImagen(fotoOriginal),
       };
-
-      console.log("usuario final seteado:", usuario);
 
       setPerfil(usuario);
 
@@ -256,8 +252,6 @@ const ProfileScreen = () => {
 
       const productosData = await productosResponse.json().catch(() => null);
 
-      console.log("PRODUCTOS API:", productosData);
-
       if (!productosResponse.ok) {
         throw new Error(
           productosData?.message || "No se pudieron cargar los productos."
@@ -270,31 +264,23 @@ const ProfileScreen = () => {
         ? productosData.data
         : [];
 
-      const listaProductos: Producto[] = lista.map((item: any) => {
-        const imagenUrl = normalizarUrlImagen(
+      const listaProductos: Producto[] = lista.map((item: any) => ({
+        id: item.id,
+        nombre: item.nombre,
+        descripcion: item.descripcion,
+        precio: item.precio,
+        imagen_url: normalizarUrlImagen(
           item?.fotos?.[0]?.url || item.imagen_url || item.imagen || null
-        );
-
-        console.log("URL producto:", imagenUrl);
-
-        return {
-          id: item.id,
-          nombre: item.nombre,
-          descripcion: item.descripcion,
-          precio: item.precio,
-          imagen_url: imagenUrl,
-        };
-      });
-
-      console.log("PRODUCTOS PROCESADOS:", listaProductos);
+        ),
+      }));
 
       setProductos(listaProductos);
     } catch (error: any) {
-      console.error("Error cargando perfil:", error);
       Alert.alert("Error", error?.message || "Ocurrió un error al cargar el perfil.");
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setProductoAccionandoId(null);
     }
   }, []);
 
@@ -305,16 +291,86 @@ const ProfileScreen = () => {
   );
 
   const onRefresh = () => {
-    console.log("Refresh manual perfil");
     setRefreshing(true);
     cargarPerfilYProductos();
   };
 
-  console.log("Render imagen perfil:", {
-    foto_url: perfil?.foto_url,
-    tieneFoto: !!perfil?.foto_url,
-    mostrarImagenPerfil,
-  });
+  const irAEditarProducto = (productoId: number) => {
+    router.push({
+      pathname: "/Vender" as any,
+      params: {
+        edit: "true",
+        productId: String(productoId),
+      },
+    });
+  };
+
+  const eliminarProductoPorEstado = async (productoId: number) => {
+    try {
+      const token = await getToken();
+
+      if (!token) {
+        Alert.alert("Sesión", "No se encontró el token del usuario.");
+        return;
+      }
+
+      setProductoAccionandoId(productoId);
+
+      const response = await fetch(`${API_BASE_URL}/productos/${productoId}/estado`, {
+        method: "PATCH",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          estado_id: ESTADO_ELIMINADO_ID,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "No fue posible cambiar el estado del producto."
+        );
+      }
+
+      Alert.alert("Éxito", "Producto eliminado correctamente.");
+      cargarPerfilYProductos();
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "No fue posible eliminar el producto.");
+      setProductoAccionandoId(null);
+    }
+  };
+
+  const abrirMenuProducto = (producto: Producto) => {
+    Alert.alert(producto.nombre, "Selecciona una acción", [
+      {
+        text: "Editar",
+        onPress: () => irAEditarProducto(producto.id),
+      },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            "Eliminar producto",
+            "¿Seguro que deseas eliminar este producto?",
+            [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Eliminar",
+                style: "destructive",
+                onPress: () => eliminarProductoPorEstado(producto.id),
+              },
+            ]
+          );
+        },
+      },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
 
   if (loading) {
     return (
@@ -374,40 +430,12 @@ const ProfileScreen = () => {
                     source={{ uri: perfil.foto_url }}
                     style={{ width: "100%", height: "100%" }}
                     resizeMode="cover"
-                    onLoadStart={() => {
-                      console.log("Imagen perfil: inicia carga");
-                      console.log("URI:", perfil.foto_url);
-                    }}
-                    onLoad={() => {
-                      console.log("Imagen perfil: cargó correctamente");
-                      console.log("URI:", perfil.foto_url);
-                    }}
-                    onLoadEnd={() => {
-                      console.log("Imagen perfil: terminó proceso de carga");
-                      console.log("URI:", perfil.foto_url);
-                    }}
-                    onError={(e) => {
-                      console.log("ERROR FOTO PERFIL:", e.nativeEvent);
-                      console.log("URL FALLIDA PERFIL:", perfil.foto_url);
-                    }}
                   />
                 ) : (
                   <Image
                     source={defaultUserImage}
                     style={{ width: avatarBox.img, height: avatarBox.img }}
                     resizeMode="contain"
-                    onLoad={() => {
-                      console.log("Imagen por defecto de perfil cargada");
-                    }}
-                    onLoadStart={() => {
-                      console.log("Imagen por defecto de perfil: inicia carga");
-                    }}
-                    onLoadEnd={() => {
-                      console.log("Imagen por defecto de perfil: terminó proceso");
-                    }}
-                    onError={(e) => {
-                      console.log("ERROR IMAGEN DEFAULT PERFIL:", e.nativeEvent);
-                    }}
                   />
                 )}
               </View>
@@ -419,43 +447,6 @@ const ProfileScreen = () => {
             >
               {perfil?.nombre || "Usuario"}
             </Text>
-
-            <View
-              style={{
-                flexDirection: "row",
-                width: "75%",
-                justifyContent: "space-between",
-                marginTop: 14,
-              }}
-            >
-              <CustomButton
-                variant="icon-only"
-                color="sextary"
-                onPress={abrirRedSocial}
-                icon={<Ionicons name="share-social" size={20} color="#fff" />}
-              />
-
-              <CustomButton
-                variant="icon-only"
-                color="sextary"
-                onPress={() => router.push("/editprofile" as any)}
-                icon={<MaterialCommunityIcons name="account-edit" size={20} color="#fff" />}
-              />
-
-              <CustomButton
-                variant="icon-only"
-                color="sextary"
-                onPress={() => router.push("/")}
-                icon={<Ionicons name="bag-outline" size={20} color="#fff" />}
-              />
-
-              <CustomButton
-                variant="icon-only"
-                color="sextary"
-                onPress={() => router.push("/(tabs)/Chats")}
-                icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
-              />
-            </View>
 
             <View style={{ width: "75%", marginTop: 18 }}>
               <Text className="text-center text-gray-600 leading-6">
@@ -502,6 +493,43 @@ const ProfileScreen = () => {
                   </View>
                 </View>
               )}
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  width: "100%",
+                  justifyContent: "space-between",
+                  marginTop: 18,
+                }}
+              >
+                <CustomButton
+                  variant="icon-only"
+                  color="sextary"
+                  onPress={compartirPerfil}
+                  icon={<Ionicons name="share-social" size={20} color="#fff" />}
+                />
+
+                <CustomButton
+                  variant="icon-only"
+                  color="sextary"
+                  onPress={() => router.push("/editprofile" as any)}
+                  icon={<MaterialCommunityIcons name="account-edit" size={20} color="#fff" />}
+                />
+
+                <CustomButton
+                  variant="icon-only"
+                  color="sextary"
+                  onPress={() => router.push("/")}
+                  icon={<Ionicons name="bag-outline" size={20} color="#fff" />}
+                />
+
+                <CustomButton
+                  variant="icon-only"
+                  color="sextary"
+                  onPress={() => router.push("/(tabs)/Chats")}
+                  icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
+                />
+              </View>
             </View>
           </View>
 
@@ -526,19 +554,43 @@ const ProfileScreen = () => {
             <View className="flex-row flex-wrap" style={{ marginTop: 6 }}>
               {productos.map((producto) => (
                 <View key={producto.id} className="w-1/2 p-2">
-                  <CustomButton
-                    variant="card"
-                    isOwner={true}
-                    source={producto.imagen_url ? { uri: producto.imagen_url } : undefined}
-                    defaultImage={defaultProductImage}
-                    price={formatearPrecio(producto.precio)}
-                    onPress={() => router.push(`/product/${producto.id}` as any)}
-                    onCartPress={() =>
-                      router.push(`/product/${producto.id}?modal=true` as any)
-                    }
-                  >
-                    {producto.nombre}
-                  </CustomButton>
+                  <View style={{ position: "relative" }}>
+                    <CustomButton
+                      variant="card"
+                      isOwner={true}
+                      source={producto.imagen_url ? { uri: producto.imagen_url } : undefined}
+                      defaultImage={defaultProductImage}
+                      price={formatearPrecio(producto.precio)}
+                      onPress={() => router.push(`/product/${producto.id}` as any)}
+                      onCartPress={() =>
+                        router.push(`/product/${producto.id}?modal=true` as any)
+                      }
+                    >
+                      {producto.nombre}
+                    </CustomButton>
+
+                    <Pressable
+                      onPress={() => abrirMenuProducto(producto)}
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        right: 10,
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        backgroundColor: "rgba(0,0,0,0.55)",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        zIndex: 20,
+                      }}
+                    >
+                      {productoAccionandoId === producto.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+                      )}
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </View>
@@ -593,22 +645,6 @@ const ProfileScreen = () => {
                 height: "75%",
               }}
               resizeMode="contain"
-              onLoadStart={() => {
-                console.log("Modal imagen perfil: inicia carga");
-                console.log("URI modal:", perfil?.foto_url ?? "defaultUserImage");
-              }}
-              onLoad={() => {
-                console.log("Modal imagen perfil: cargó correctamente");
-                console.log("URI modal:", perfil?.foto_url ?? "defaultUserImage");
-              }}
-              onLoadEnd={() => {
-                console.log("Modal imagen perfil: terminó proceso");
-                console.log("URI modal:", perfil?.foto_url ?? "defaultUserImage");
-              }}
-              onError={(e) => {
-                console.log("ERROR MODAL FOTO PERFIL:", e.nativeEvent);
-                console.log("URL FALLIDA MODAL PERFIL:", perfil?.foto_url);
-              }}
             />
           </Pressable>
         </Pressable>

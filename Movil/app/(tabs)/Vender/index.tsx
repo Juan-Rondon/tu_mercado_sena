@@ -2,8 +2,8 @@ import CustomButton from "@/components/buttons/CustomButton";
 import CustomInput from "@/components/inputs/CustomInput";
 import { getToken } from "@/src/lib/authToken";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -19,6 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const API_BASE_URL = "https://tumercadosena.shop/api";
+const API_HOST = "https://tumercadosena.shop";
 
 type Subcategoria = {
   id: number;
@@ -41,6 +42,10 @@ type Integridad = {
 const VenderScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
+
+  const isEditMode = params?.edit === "true";
+  const productId = params?.productId ? String(params.productId) : null;
 
   const [images, setImages] = useState<string[]>([]);
   const [nombre, setNombre] = useState("");
@@ -63,6 +68,13 @@ const VenderScreen = () => {
 
   const [loadingCategorias, setLoadingCategorias] = useState(false);
   const [loadingIntegridades, setLoadingIntegridades] = useState(false);
+  const [loadingProductoEditar, setLoadingProductoEditar] = useState(false);
+
+  const [imagenesOriginales, setImagenesOriginales] = useState<string[]>([]);
+
+  const tituloPantalla = useMemo(() => {
+    return isEditMode ? "Editar producto" : "Publicar Nuevo producto";
+  }, [isEditMode]);
 
   useEffect(() => {
     cargarCategorias();
@@ -71,6 +83,7 @@ const VenderScreen = () => {
 
   const limpiarFormulario = useCallback(() => {
     setImages([]);
+    setImagenesOriginales([]);
     setNombre("");
     setDescripcion("");
     setPrecio("");
@@ -89,9 +102,19 @@ const VenderScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      limpiarFormulario();
-    }, [limpiarFormulario])
+      if (!isEditMode) {
+        limpiarFormulario();
+      }
+    }, [isEditMode, limpiarFormulario])
   );
+
+  useEffect(() => {
+    const yaTengoCatalogos = categorias.length > 0 && integridades.length > 0;
+
+    if (isEditMode && productId && yaTengoCatalogos) {
+      cargarProductoParaEditar(productId);
+    }
+  }, [isEditMode, productId, categorias, integridades]);
 
   const normalizarArray = (json: any) => {
     if (Array.isArray(json)) return json;
@@ -125,6 +148,35 @@ const VenderScreen = () => {
 
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     return `${base}${cleanPath}`;
+  };
+
+  const normalizarUrlImagen = (url?: string | null) => {
+    if (!url) return null;
+
+    const limpio = String(url).trim();
+    if (!limpio) return null;
+
+    if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
+      return limpio;
+    }
+
+    if (limpio.startsWith("/storage/")) {
+      return `${API_HOST}${limpio}`;
+    }
+
+    if (limpio.startsWith("storage/")) {
+      return `${API_HOST}/${limpio}`;
+    }
+
+    if (limpio.startsWith("/")) {
+      return `${API_HOST}${limpio}`;
+    }
+
+    if (limpio.startsWith("usuarios/")) {
+      return `${API_HOST}/storage/${limpio}`;
+    }
+
+    return `${API_HOST}/${limpio}`;
   };
 
   const cargarCategorias = async () => {
@@ -233,6 +285,120 @@ const VenderScreen = () => {
     }
   };
 
+  const cargarProductoParaEditar = async (id: string) => {
+  try {
+    setLoadingProductoEditar(true);
+
+    const token = await getToken();
+
+    if (!token) {
+      Alert.alert("Error", "No hay sesión activa.");
+      return;
+    }
+
+    const res = await fetch(apiUrl(`/productos/${id}`), {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const json = await res.json().catch(() => null);
+
+    console.log("PRODUCTO PARA EDITAR:", JSON.stringify(json, null, 2));
+
+    if (!res.ok) {
+      Alert.alert("Error", json?.message || "No se pudo cargar el producto.");
+      return;
+    }
+
+    const p = json?.data ?? json;
+
+    const categoriaIdBackend =
+      p?.categoria?.id != null
+        ? Number(p.categoria.id)
+        : p?.subcategoria?.categoria_id != null
+        ? Number(p.subcategoria.categoria_id)
+        : p?.categoria_id != null
+        ? Number(p.categoria_id)
+        : null;
+
+    const subcategoriaIdBackend =
+      p?.subcategoria?.id != null
+        ? Number(p.subcategoria.id)
+        : p?.subcategoria_id != null
+        ? Number(p.subcategoria_id)
+        : null;
+
+    const integridadIdBackend =
+      p?.integridad?.id != null
+        ? Number(p.integridad.id)
+        : p?.integridad_id != null
+        ? Number(p.integridad_id)
+        : null;
+
+    console.log("categoriaIdBackend:", categoriaIdBackend);
+    console.log("subcategoriaIdBackend:", subcategoriaIdBackend);
+    console.log("integridadIdBackend:", integridadIdBackend);
+    console.log("categorias cargadas:", categorias);
+    console.log("integridades cargadas:", integridades);
+
+    const categoriaEncontrada =
+      categorias.find((c) => Number(c.id) === Number(categoriaIdBackend)) || null;
+
+    const subcategoriasDeCategoria = Array.isArray(categoriaEncontrada?.subcategorias)
+      ? categoriaEncontrada!.subcategorias!
+      : [];
+
+    const subcategoriaEncontrada =
+      subcategoriasDeCategoria.find(
+        (s) => Number(s.id) === Number(subcategoriaIdBackend)
+      ) || null;
+
+    const integridadEncontrada =
+      integridades.find((i) => Number(i.id) === Number(integridadIdBackend)) || null;
+
+    const fotosExistentes = Array.isArray(p?.fotos)
+      ? p.fotos
+          .map((foto: any) => normalizarUrlImagen(foto?.url))
+          .filter(Boolean)
+      : [];
+
+    setNombre(String(p?.nombre ?? ""));
+    setDescripcion(String(p?.descripcion ?? ""));
+    setPrecio(formatearPesosCOP(String(p?.precio ?? "")));
+    setCantidad(String(p?.disponibles ?? ""));
+
+    setCategoriaId(categoriaEncontrada?.id ?? categoriaIdBackend ?? null);
+    setCategoriaNombre(
+      categoriaEncontrada?.nombre ??
+        String(p?.categoria?.nombre ?? "")
+    );
+
+    setSubcategorias(subcategoriasDeCategoria);
+
+    setSubcategoriaId(subcategoriaEncontrada?.id ?? subcategoriaIdBackend ?? null);
+    setSubcategoriaNombre(
+      subcategoriaEncontrada?.nombre ??
+        String(p?.subcategoria?.nombre ?? "")
+    );
+
+    setIntegridadId(integridadEncontrada?.id ?? integridadIdBackend ?? null);
+    setIntegridadNombre(
+      integridadEncontrada?.nombre ??
+        String(p?.integridad?.nombre ?? "")
+    );
+
+    setImagenesOriginales(fotosExistentes.slice(0, 3));
+    setImages(fotosExistentes.slice(0, 3));
+  } catch (error) {
+    Alert.alert("Error", "No fue posible cargar el producto para editar.");
+  } finally {
+    setLoadingProductoEditar(false);
+  }
+};
+
   const seleccionarCategoria = (nombreCategoria: string) => {
     const categoria = categorias.find((c) => c.nombre === nombreCategoria);
     if (!categoria) return;
@@ -298,7 +464,48 @@ const VenderScreen = () => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handlePublicar = async () => {
+  const construirFormData = () => {
+    const formData = new FormData();
+
+    formData.append("nombre", nombre.trim());
+    formData.append("descripcion", descripcion.trim());
+    formData.append("precio", limpiarNumero(precio));
+    formData.append("disponibles", limpiarNumero(cantidad));
+    formData.append("categoria_id", String(categoriaId));
+    formData.append("subcategoria_id", String(subcategoriaId));
+    formData.append("integridad_id", String(integridadId));
+
+    /**
+     * Si estás editando y tu backend necesita saber cuáles imágenes existentes conservar,
+     * puedes enviar este arreglo. Ajusta el nombre del campo si en backend es otro.
+     */
+    if (isEditMode) {
+      imagenesOriginales.forEach((uri) => {
+        if (images.includes(uri)) {
+          formData.append("imagenes_existentes[]", uri);
+        }
+      });
+    }
+
+    images.forEach((uri, index) => {
+      const esNueva = !uri.startsWith("http://") && !uri.startsWith("https://");
+
+      if (esNueva) {
+        formData.append(
+          "imagenes[]",
+          {
+            uri,
+            name: `imagen_${index}.jpg`,
+            type: "image/jpeg",
+          } as any
+        );
+      }
+    });
+
+    return formData;
+  };
+
+  const handleGuardar = async () => {
     if (
       !nombre.trim() ||
       !descripcion.trim() ||
@@ -325,51 +532,65 @@ const VenderScreen = () => {
         return;
       }
 
-      const formData = new FormData();
+      const formData = construirFormData();
 
-      formData.append("nombre", nombre.trim());
-      formData.append("descripcion", descripcion.trim());
-      formData.append("precio", limpiarNumero(precio));
-      formData.append("disponibles", limpiarNumero(cantidad));
-      formData.append("categoria_id", String(categoriaId));
-      formData.append("subcategoria_id", String(subcategoriaId));
-      formData.append("integridad_id", String(integridadId));
+      let res: Response;
 
-      images.forEach((uri, index) => {
-        formData.append(
-          "imagenes[]",
-          {
-            uri,
-            name: `imagen_${index}.jpg`,
-            type: "image/jpeg",
-          } as any
-        );
-      });
+      if (isEditMode && productId) {
+        /**
+         * Si tu backend acepta PATCH multipart directamente, puedes usar method: "PATCH".
+         * Aquí uso POST + _method=PATCH porque suele funcionar mejor con multipart en Laravel.
+         */
+        formData.append("_method", "PATCH");
 
-      const res = await fetch(apiUrl("/productos"), {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+        res = await fetch(apiUrl(`/productos/${productId}`), {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      } else {
+        res = await fetch(apiUrl("/productos"), {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      }
 
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        Alert.alert("Error", data?.message || "No se pudo crear el producto.");
+        Alert.alert(
+          "Error",
+          data?.message ||
+            (isEditMode
+              ? "No se pudo actualizar el producto."
+              : "No se pudo crear el producto.")
+        );
         return;
       }
 
-      limpiarFormulario();
+      if (!isEditMode) {
+        limpiarFormulario();
+      }
 
-      Alert.alert("Éxito", "Producto publicado correctamente.", [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ]);
+      Alert.alert(
+        "Éxito",
+        isEditMode
+          ? "Producto actualizado correctamente."
+          : "Producto publicado correctamente.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ]
+      );
     } catch (error) {
       Alert.alert("Error", "No fue posible conectar con el servidor.");
     } finally {
@@ -430,11 +651,17 @@ const VenderScreen = () => {
         >
           <View className="bg-sextary-600 items-center py-3">
             <Text className="text-white text-lg font-semibold">
-              Publicar Nuevo producto
+              {tituloPantalla}
             </Text>
           </View>
 
           <View className="m-4 rounded-xl border border-sextary-600 p-4 bg-white">
+            {loadingProductoEditar ? (
+              <Text className="text-center text-gray-500 mb-4">
+                Cargando información del producto...
+              </Text>
+            ) : null}
+
             <Text className="font-semibold mb-1">Nombre del Producto *</Text>
             <CustomInput
               value={nombre}
@@ -548,11 +775,17 @@ const VenderScreen = () => {
               variant="contained"
               className="rounded-l-full rounded-r-full py-4"
               color="sextary"
-              onPress={handlePublicar}
-              disabled={loading}
+              onPress={handleGuardar}
+              disabled={loading || loadingProductoEditar}
             >
               <Text className="text-white text-lg text-center">
-                {loading ? "Publicando..." : "Publicar Producto"}
+                {loading
+                  ? isEditMode
+                    ? "Actualizando..."
+                    : "Publicando..."
+                  : isEditMode
+                  ? "Guardar cambios"
+                  : "Publicar Producto"}
               </Text>
             </CustomButton>
 
@@ -560,7 +793,9 @@ const VenderScreen = () => {
               variant="contained"
               className="bg-red-600 rounded-l-full rounded-r-full py-4 mt-3"
               onPress={() => {
-                limpiarFormulario();
+                if (!isEditMode) {
+                  limpiarFormulario();
+                }
                 router.back();
               }}
               disabled={loading}

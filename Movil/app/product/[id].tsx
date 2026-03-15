@@ -14,10 +14,41 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type ImageSourcePropType,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const API_BASE_URL = "https://tumercadosena.shop";
+const defaultProductImage = require("../../assets/images/imagedefault.png");
+
+type ApiFoto = {
+  id: number;
+  url: string;
+};
+
+type ApiVendedor = {
+  id?: number;
+  nickname?: string | null;
+};
+
+type ApiProducto = {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  precio: number;
+  vendedor_id?: number;
+  vendedor?: ApiVendedor;
+  fotos?: ApiFoto[];
+  imagen?: string | null;
+  imagen_url?: string | null;
+};
+
+type RelatedItem = {
+  id: string;
+  title: string;
+  price: string;
+  imageSource?: ImageSourcePropType;
+};
 
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();
@@ -28,6 +59,7 @@ export default function ProductDetail() {
   const modalScrollRef = useRef<ScrollView>(null);
 
   const [product, setProduct] = useState<any>(null);
+  const [relatedProducts, setRelatedProducts] = useState<RelatedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -36,11 +68,9 @@ export default function ProductDetail() {
   const imageHeight = Math.max(220, Math.min(320, width * 0.75));
   const cardWidth = Math.max(180, Math.min(220, width * 0.55));
 
-  console.log("ID QUE LLEGA:", id);
-
   useEffect(() => {
     if (id) {
-      fetchProduct();
+      fetchProductAndSuggestions();
     }
   }, [id]);
 
@@ -55,14 +85,63 @@ export default function ProductDetail() {
     }
   }, [viewerVisible, selectedIndex, width, product]);
 
-  const fetchProduct = async () => {
+  const formatCOP = (n: number) =>
+    n.toLocaleString("es-CO", {
+      style: "currency",
+      currency: "COP",
+    });
+
+  const normalizarUrlImagen = (url?: string | null) => {
+    if (!url) return null;
+
+    const limpio = String(url).trim();
+    if (!limpio) return null;
+
+    if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
+      return limpio;
+    }
+
+    if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
+      return `${API_BASE_URL}/${limpio.replace(/^\/+/, "")}`;
+    }
+
+    if (limpio.startsWith("/")) {
+      return `${API_BASE_URL}${limpio}`;
+    }
+
+    return limpio;
+  };
+
+  const mapProductosAItems = (productos: ApiProducto[]): RelatedItem[] => {
+    return productos.map((p) => {
+      let imageUrl: string | null = null;
+
+      if (Array.isArray(p.fotos) && p.fotos.length > 0) {
+        imageUrl = normalizarUrlImagen(p.fotos[0].url);
+      } else {
+        imageUrl = normalizarUrlImagen(p.imagen_url || p.imagen || null);
+      }
+
+      const imageSource: ImageSourcePropType | undefined = imageUrl
+        ? { uri: imageUrl }
+        : undefined;
+
+      return {
+        id: String(p.id),
+        title: p.nombre,
+        price: formatCOP(Number(p.precio || 0)),
+        imageSource,
+      };
+    });
+  };
+
+  const fetchProductAndSuggestions = async () => {
     try {
+      setLoading(true);
+
       const token = await getToken();
 
-      console.log("ID:", id);
-      console.log("URL:", `${API_BASE_URL}/api/productos/${id}`);
-
-      const response = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
+      const productResponse = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -70,36 +149,77 @@ export default function ProductDetail() {
         },
       });
 
-      const json = await response.json();
+      const productJson = await productResponse.json().catch(() => null);
 
-      console.log("RESPUESTA API:", json);
+      console.log("RESPUESTA API PRODUCTO:", productJson);
 
-      if (!response.ok) {
-        console.log("ERROR BACKEND:", json);
+      if (!productResponse.ok) {
         setLoading(false);
         return;
       }
 
-      const p = json.data;
+      const p: ApiProducto = productJson?.data;
+
+      const images =
+        Array.isArray(p?.fotos) && p.fotos.length > 0
+          ? p.fotos
+              .map((foto) => {
+                const uri = normalizarUrlImagen(foto?.url);
+                return uri ? { uri } : null;
+              })
+              .filter(Boolean)
+          : [];
 
       setProduct({
         id: p.id,
         name: p.nombre,
-        price: p.precio.toLocaleString("es-CO", {
-          style: "currency",
-          currency: "COP",
-        }),
+        description: p.descripcion ?? "",
+        price: formatCOP(Number(p.precio || 0)),
         seller: p.vendedor?.nickname ?? "Usuario",
-        images: Array.isArray(p.fotos)
-          ? p.fotos.map((foto: any) => ({
-              uri: foto.url,
-            }))
-          : [],
+        sellerId: p.vendedor?.id ?? p.vendedor_id ?? null,
+        images,
       });
 
-      setLoading(false);
+      const relatedResponse = await fetch(`${API_BASE_URL}/api/productos`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const relatedJson = await relatedResponse.json().catch(() => null);
+
+      console.log("RESPUESTA API RELACIONADOS:", relatedJson);
+
+      if (!relatedResponse.ok) {
+        setRelatedProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      const lista: ApiProducto[] = Array.isArray(relatedJson)
+        ? relatedJson
+        : Array.isArray(relatedJson?.data)
+        ? relatedJson.data
+        : [];
+
+      const sellerIdActual = p.vendedor?.id ?? p.vendedor_id ?? null;
+
+      const otrosUsuarios = lista.filter((item) => {
+        const mismoProducto = Number(item.id) === Number(p.id);
+        const sellerIdItem = item.vendedor?.id ?? item.vendedor_id ?? null;
+        const mismoVendedor =
+          sellerIdActual !== null && sellerIdItem === sellerIdActual;
+
+        return !mismoProducto && !mismoVendedor;
+      });
+
+      setRelatedProducts(mapProductosAItems(otrosUsuarios.slice(0, 10)));
     } catch (error) {
       console.log("ERROR:", error);
+      setRelatedProducts([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -171,6 +291,7 @@ export default function ProductDetail() {
                     height: imageHeight,
                     borderRadius: 16,
                     marginRight: 12,
+                    backgroundColor: "#f3f4f6",
                   }}
                   resizeMode="cover"
                 />
@@ -214,25 +335,45 @@ export default function ProductDetail() {
           Productos que quizás te interesen
         </Text>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 8 }}
-        >
-          <View style={{ flexDirection: "row" }}>
-            {[1, 2, 3].map((k) => (
-              <View key={k} style={{ width: cardWidth, marginRight: 12 }}>
-                <CustomButton
-                  variant="card"
-                  price="$0"
-                  onPress={() => router.push("/(tabs)/Home")}
-                >
-                  Producto
-                </CustomButton>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+        {relatedProducts.length === 0 ? (
+          <Text style={{ color: "#6B7280" }}>
+            No hay productos de otros usuarios para mostrar.
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 8 }}
+          >
+            <View style={{ flexDirection: "row" }}>
+              {relatedProducts.map((item) => (
+                <View key={item.id} style={{ width: cardWidth, marginRight: 12 }}>
+                  <CustomButton
+                    variant="card"
+                    isOwner={false}
+                    source={item.imageSource}
+                    defaultImage={defaultProductImage}
+                    price={item.price}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/product/[id]",
+                        params: { id: item.id },
+                      })
+                    }
+                    onCartPress={() =>
+                      router.push({
+                        pathname: "/product/[id]",
+                        params: { id: item.id, modal: "true" },
+                      })
+                    }
+                  >
+                    {item.title}
+                  </CustomButton>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
       </ScrollView>
 
       <Modal
