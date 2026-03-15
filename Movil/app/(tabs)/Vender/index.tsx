@@ -39,13 +39,18 @@ type Integridad = {
   descripcion?: string | null;
 };
 
+type ImagenOriginal = {
+  id: number;
+  url: string;
+};
+
 const VenderScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
 
-  const isEditMode = params?.edit === "true";
-  const productId = params?.productId ? String(params.productId) : null;
+  const [modoEdicionActivo, setModoEdicionActivo] = useState(false);
+  const [productoEditarId, setProductoEditarId] = useState<string | null>(null);
 
   const [images, setImages] = useState<string[]>([]);
   const [nombre, setNombre] = useState("");
@@ -70,11 +75,11 @@ const VenderScreen = () => {
   const [loadingIntegridades, setLoadingIntegridades] = useState(false);
   const [loadingProductoEditar, setLoadingProductoEditar] = useState(false);
 
-  const [imagenesOriginales, setImagenesOriginales] = useState<string[]>([]);
+  const [imagenesOriginales, setImagenesOriginales] = useState<ImagenOriginal[]>([]);
 
   const tituloPantalla = useMemo(() => {
-    return isEditMode ? "Editar producto" : "Publicar Nuevo producto";
-  }, [isEditMode]);
+    return modoEdicionActivo ? "Editar producto" : "Publicar Nuevo producto";
+  }, [modoEdicionActivo]);
 
   useEffect(() => {
     cargarCategorias();
@@ -98,23 +103,39 @@ const VenderScreen = () => {
     setIntegridadNombre("");
 
     setSubcategorias([]);
+    setLoadingProductoEditar(false);
   }, []);
+
+  useEffect(() => {
+    const edit =
+      params?.edit === "true" &&
+      params?.productId !== undefined &&
+      params?.productId !== null &&
+      String(params.productId).trim() !== "";
+
+    setModoEdicionActivo(edit);
+    setProductoEditarId(edit ? String(params.productId) : null);
+
+    if (!edit) {
+      limpiarFormulario();
+    }
+  }, [params?.edit, params?.productId, limpiarFormulario]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!isEditMode) {
+      if (!modoEdicionActivo) {
         limpiarFormulario();
       }
-    }, [isEditMode, limpiarFormulario])
+    }, [modoEdicionActivo, limpiarFormulario])
   );
 
   useEffect(() => {
     const yaTengoCatalogos = categorias.length > 0 && integridades.length > 0;
 
-    if (isEditMode && productId && yaTengoCatalogos) {
-      cargarProductoParaEditar(productId);
+    if (modoEdicionActivo && productoEditarId && yaTengoCatalogos) {
+      cargarProductoParaEditar(productoEditarId);
     }
-  }, [isEditMode, productId, categorias, integridades]);
+  }, [modoEdicionActivo, productoEditarId, categorias, integridades]);
 
   const normalizarArray = (json: any) => {
     if (Array.isArray(json)) return json;
@@ -286,118 +307,117 @@ const VenderScreen = () => {
   };
 
   const cargarProductoParaEditar = async (id: string) => {
-  try {
-    setLoadingProductoEditar(true);
+    try {
+      setLoadingProductoEditar(true);
 
-    const token = await getToken();
+      const token = await getToken();
 
-    if (!token) {
-      Alert.alert("Error", "No hay sesión activa.");
-      return;
+      if (!token) {
+        Alert.alert("Error", "No hay sesión activa.");
+        return;
+      }
+
+      const res = await fetch(apiUrl(`/productos/${id}`), {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+
+      console.log("PRODUCTO PARA EDITAR:", JSON.stringify(json, null, 2));
+
+      if (!res.ok) {
+        Alert.alert("Error", json?.message || "No se pudo cargar el producto.");
+        return;
+      }
+
+      const p = json?.data ?? json;
+
+      const categoriaIdBackend =
+        p?.categoria?.id != null
+          ? Number(p.categoria.id)
+          : p?.subcategoria?.categoria_id != null
+          ? Number(p.subcategoria.categoria_id)
+          : p?.categoria_id != null
+          ? Number(p.categoria_id)
+          : null;
+
+      const subcategoriaIdBackend =
+        p?.subcategoria?.id != null
+          ? Number(p.subcategoria.id)
+          : p?.subcategoria_id != null
+          ? Number(p.subcategoria_id)
+          : null;
+
+      const integridadIdBackend =
+        p?.integridad?.id != null
+          ? Number(p.integridad.id)
+          : p?.integridad_id != null
+          ? Number(p.integridad_id)
+          : null;
+
+      const categoriaEncontrada =
+        categorias.find((c) => Number(c.id) === Number(categoriaIdBackend)) || null;
+
+      const subcategoriasDeCategoria = Array.isArray(categoriaEncontrada?.subcategorias)
+        ? categoriaEncontrada.subcategorias!
+        : [];
+
+      const subcategoriaEncontrada =
+        subcategoriasDeCategoria.find(
+          (s) => Number(s.id) === Number(subcategoriaIdBackend)
+        ) || null;
+
+      const integridadEncontrada =
+        integridades.find((i) => Number(i.id) === Number(integridadIdBackend)) || null;
+
+      const fotosExistentes: ImagenOriginal[] = Array.isArray(p?.fotos)
+        ? p.fotos
+            .map((foto: any) => {
+              const urlNormalizada = normalizarUrlImagen(foto?.url);
+              if (!urlNormalizada || foto?.id == null) return null;
+
+              return {
+                id: Number(foto.id),
+                url: urlNormalizada,
+              };
+            })
+            .filter(Boolean)
+        : [];
+
+      setNombre(String(p?.nombre ?? ""));
+      setDescripcion(String(p?.descripcion ?? ""));
+      setPrecio(formatearPesosCOP(String(p?.precio ?? "")));
+      setCantidad(String(p?.disponibles ?? ""));
+
+      setCategoriaId(categoriaEncontrada?.id ?? categoriaIdBackend ?? null);
+      setCategoriaNombre(
+        categoriaEncontrada?.nombre ?? String(p?.categoria?.nombre ?? "")
+      );
+
+      setSubcategorias(subcategoriasDeCategoria);
+
+      setSubcategoriaId(subcategoriaEncontrada?.id ?? subcategoriaIdBackend ?? null);
+      setSubcategoriaNombre(
+        subcategoriaEncontrada?.nombre ?? String(p?.subcategoria?.nombre ?? "")
+      );
+
+      setIntegridadId(integridadEncontrada?.id ?? integridadIdBackend ?? null);
+      setIntegridadNombre(
+        integridadEncontrada?.nombre ?? String(p?.integridad?.nombre ?? "")
+      );
+
+      setImagenesOriginales(fotosExistentes.slice(0, 3));
+      setImages(fotosExistentes.slice(0, 3).map((foto) => foto.url));
+    } catch (error) {
+      Alert.alert("Error", "No fue posible cargar el producto para editar.");
+    } finally {
+      setLoadingProductoEditar(false);
     }
-
-    const res = await fetch(apiUrl(`/productos/${id}`), {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const json = await res.json().catch(() => null);
-
-    console.log("PRODUCTO PARA EDITAR:", JSON.stringify(json, null, 2));
-
-    if (!res.ok) {
-      Alert.alert("Error", json?.message || "No se pudo cargar el producto.");
-      return;
-    }
-
-    const p = json?.data ?? json;
-
-    const categoriaIdBackend =
-      p?.categoria?.id != null
-        ? Number(p.categoria.id)
-        : p?.subcategoria?.categoria_id != null
-        ? Number(p.subcategoria.categoria_id)
-        : p?.categoria_id != null
-        ? Number(p.categoria_id)
-        : null;
-
-    const subcategoriaIdBackend =
-      p?.subcategoria?.id != null
-        ? Number(p.subcategoria.id)
-        : p?.subcategoria_id != null
-        ? Number(p.subcategoria_id)
-        : null;
-
-    const integridadIdBackend =
-      p?.integridad?.id != null
-        ? Number(p.integridad.id)
-        : p?.integridad_id != null
-        ? Number(p.integridad_id)
-        : null;
-
-    console.log("categoriaIdBackend:", categoriaIdBackend);
-    console.log("subcategoriaIdBackend:", subcategoriaIdBackend);
-    console.log("integridadIdBackend:", integridadIdBackend);
-    console.log("categorias cargadas:", categorias);
-    console.log("integridades cargadas:", integridades);
-
-    const categoriaEncontrada =
-      categorias.find((c) => Number(c.id) === Number(categoriaIdBackend)) || null;
-
-    const subcategoriasDeCategoria = Array.isArray(categoriaEncontrada?.subcategorias)
-      ? categoriaEncontrada!.subcategorias!
-      : [];
-
-    const subcategoriaEncontrada =
-      subcategoriasDeCategoria.find(
-        (s) => Number(s.id) === Number(subcategoriaIdBackend)
-      ) || null;
-
-    const integridadEncontrada =
-      integridades.find((i) => Number(i.id) === Number(integridadIdBackend)) || null;
-
-    const fotosExistentes = Array.isArray(p?.fotos)
-      ? p.fotos
-          .map((foto: any) => normalizarUrlImagen(foto?.url))
-          .filter(Boolean)
-      : [];
-
-    setNombre(String(p?.nombre ?? ""));
-    setDescripcion(String(p?.descripcion ?? ""));
-    setPrecio(formatearPesosCOP(String(p?.precio ?? "")));
-    setCantidad(String(p?.disponibles ?? ""));
-
-    setCategoriaId(categoriaEncontrada?.id ?? categoriaIdBackend ?? null);
-    setCategoriaNombre(
-      categoriaEncontrada?.nombre ??
-        String(p?.categoria?.nombre ?? "")
-    );
-
-    setSubcategorias(subcategoriasDeCategoria);
-
-    setSubcategoriaId(subcategoriaEncontrada?.id ?? subcategoriaIdBackend ?? null);
-    setSubcategoriaNombre(
-      subcategoriaEncontrada?.nombre ??
-        String(p?.subcategoria?.nombre ?? "")
-    );
-
-    setIntegridadId(integridadEncontrada?.id ?? integridadIdBackend ?? null);
-    setIntegridadNombre(
-      integridadEncontrada?.nombre ??
-        String(p?.integridad?.nombre ?? "")
-    );
-
-    setImagenesOriginales(fotosExistentes.slice(0, 3));
-    setImages(fotosExistentes.slice(0, 3));
-  } catch (error) {
-    Alert.alert("Error", "No fue posible cargar el producto para editar.");
-  } finally {
-    setLoadingProductoEditar(false);
-  }
-};
+  };
 
   const seleccionarCategoria = (nombreCategoria: string) => {
     const categoria = categorias.find((c) => c.nombre === nombreCategoria);
@@ -415,9 +435,7 @@ const VenderScreen = () => {
   };
 
   const seleccionarSubcategoria = (nombreSubcategoria: string) => {
-    const subcategoria = subcategorias.find(
-      (s) => s.nombre === nombreSubcategoria
-    );
+    const subcategoria = subcategorias.find((s) => s.nombre === nombreSubcategoria);
     if (!subcategoria) return;
 
     setSubcategoriaNombre(subcategoria.nombre);
@@ -475,14 +493,10 @@ const VenderScreen = () => {
     formData.append("subcategoria_id", String(subcategoriaId));
     formData.append("integridad_id", String(integridadId));
 
-    /**
-     * Si estás editando y tu backend necesita saber cuáles imágenes existentes conservar,
-     * puedes enviar este arreglo. Ajusta el nombre del campo si en backend es otro.
-     */
-    if (isEditMode) {
-      imagenesOriginales.forEach((uri) => {
-        if (images.includes(uri)) {
-          formData.append("imagenes_existentes[]", uri);
+    if (modoEdicionActivo) {
+      imagenesOriginales.forEach((img) => {
+        if (images.includes(img.url)) {
+          formData.append("fotos_existentes[]", String(img.id));
         }
       });
     }
@@ -505,6 +519,12 @@ const VenderScreen = () => {
     return formData;
   };
 
+  const salirDeModoEdicion = useCallback(() => {
+    setModoEdicionActivo(false);
+    setProductoEditarId(null);
+    limpiarFormulario();
+  }, [limpiarFormulario]);
+
   const handleGuardar = async () => {
     if (
       !nombre.trim() ||
@@ -515,10 +535,7 @@ const VenderScreen = () => {
       !subcategoriaId ||
       !integridadId
     ) {
-      Alert.alert(
-        "Campos requeridos",
-        "Completa todos los campos obligatorios."
-      );
+      Alert.alert("Campos requeridos", "Completa todos los campos obligatorios.");
       return;
     }
 
@@ -536,15 +553,9 @@ const VenderScreen = () => {
 
       let res: Response;
 
-      if (isEditMode && productId) {
-        /**
-         * Si tu backend acepta PATCH multipart directamente, puedes usar method: "PATCH".
-         * Aquí uso POST + _method=PATCH porque suele funcionar mejor con multipart en Laravel.
-         */
-        formData.append("_method", "PATCH");
-
-        res = await fetch(apiUrl(`/productos/${productId}`), {
-          method: "POST",
+      if (modoEdicionActivo && productoEditarId) {
+        res = await fetch(apiUrl(`/productos/${productoEditarId}`), {
+          method: "PATCH",
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${token}`,
@@ -565,23 +576,27 @@ const VenderScreen = () => {
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
+        console.log("ERROR GUARDAR PRODUCTO:", data);
+
         Alert.alert(
           "Error",
           data?.message ||
-            (isEditMode
+            (modoEdicionActivo
               ? "No se pudo actualizar el producto."
               : "No se pudo crear el producto.")
         );
         return;
       }
 
-      if (!isEditMode) {
+      if (modoEdicionActivo) {
+        salirDeModoEdicion();
+      } else {
         limpiarFormulario();
       }
 
       Alert.alert(
         "Éxito",
-        isEditMode
+        modoEdicionActivo
           ? "Producto actualizado correctamente."
           : "Producto publicado correctamente.",
         [
@@ -592,6 +607,7 @@ const VenderScreen = () => {
         ]
       );
     } catch (error) {
+      console.log("ERROR REQUEST PRODUCTO:", error);
       Alert.alert("Error", "No fue posible conectar con el servidor.");
     } finally {
       setLoading(false);
@@ -780,10 +796,10 @@ const VenderScreen = () => {
             >
               <Text className="text-white text-lg text-center">
                 {loading
-                  ? isEditMode
+                  ? modoEdicionActivo
                     ? "Actualizando..."
                     : "Publicando..."
-                  : isEditMode
+                  : modoEdicionActivo
                   ? "Guardar cambios"
                   : "Publicar Producto"}
               </Text>
@@ -793,9 +809,7 @@ const VenderScreen = () => {
               variant="contained"
               className="bg-red-600 rounded-l-full rounded-r-full py-4 mt-3"
               onPress={() => {
-                if (!isEditMode) {
-                  limpiarFormulario();
-                }
+                salirDeModoEdicion();
                 router.back();
               }}
               disabled={loading}

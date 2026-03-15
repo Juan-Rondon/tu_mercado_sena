@@ -545,6 +545,7 @@ const EditProfileScreen = () => {
 
           <View style={{ marginTop: 28, gap: 12 }}>
             <CustomButton
+              className="rounded-r-full rounded-l-full p-4"
               color="sextary"
               onPress={guardarCambios}
               disabled={saving}
@@ -565,6 +566,7 @@ const EditProfileScreen = () => {
             </CustomButton>
 
             <CustomButton
+              className="rounded-r-full rounded-l-full p-4"
               color="gray"
               onPress={confirmarSalida}
               FontText="text-base"

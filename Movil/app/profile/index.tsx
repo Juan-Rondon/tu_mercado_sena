@@ -2,7 +2,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import { getToken } from "@/src/lib/authToken";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -29,7 +29,7 @@ const API_HOST = "https://tumercadosena.shop";
 /**
  * Ajusta este valor al estado que tu backend use para "eliminado" o "inactivo".
  */
-const ESTADO_ELIMINADO_ID = 2;
+const ESTADO_ELIMINADO_ID = 3;
 
 type UsuarioPerfil = {
   id: number;
@@ -48,6 +48,8 @@ type Producto = {
 };
 
 const ProfileScreen = () => {
+  const { userId } = useLocalSearchParams<{ userId?: string }>();
+
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
 
@@ -57,12 +59,18 @@ const ProfileScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [mostrarImagenPerfil, setMostrarImagenPerfil] = useState(false);
   const [productoAccionandoId, setProductoAccionandoId] = useState<number | null>(null);
+  const [miUsuarioId, setMiUsuarioId] = useState<number | null>(null);
 
   const avatarBox = useMemo(() => {
     const size = Math.max(130, Math.min(150, width * 0.38));
     const img = Math.max(90, Math.min(100, size * 0.68));
     return { size, img };
   }, [width]);
+
+  const userIdNumber = userId ? Number(userId) : null;
+  const viendoPerfilExterno = !!userIdNumber;
+  const esMiPerfil =
+    !viendoPerfilExterno || (miUsuarioId !== null && userIdNumber === miUsuarioId);
 
   const formatearPrecio = (valor: number | string) => {
     const numero = Number(valor || 0);
@@ -109,12 +117,12 @@ const ProfileScreen = () => {
       return `${API_HOST}/${limpio}`;
     }
 
-    if (limpio.startsWith("/")) {
-      return `${API_HOST}${limpio}`;
-    }
-
     if (limpio.startsWith("usuarios/")) {
       return `${API_HOST}/storage/${limpio}`;
+    }
+
+    if (limpio.startsWith("/")) {
+      return `${API_HOST}${limpio}`;
     }
 
     return `${API_HOST}/${limpio}`;
@@ -149,31 +157,30 @@ const ProfileScreen = () => {
   };
 
   const compartirPerfil = async () => {
-  try {
-    if (!perfil?.id) {
-      Alert.alert("Perfil", "No fue posible generar el enlace del perfil.");
-      return;
-    }
-
-    const nombre = perfil?.nombre?.trim() || "Usuario";
-    const perfilUrl = `${API_HOST}/perfil/${perfil.id}`;
-
-    const mensaje = `Mira el perfil de ${nombre} en Tu Mercado SENA:\n${perfilUrl}`;
-
-    await Share.share(
-      {
-        title: `Perfil de ${nombre}`,
-        message: mensaje,
-      },
-      {
-        dialogTitle: `Compartir perfil de ${nombre}`,
-        subject: `Perfil de ${nombre}`,
+    try {
+      if (!perfil?.id) {
+        Alert.alert("Perfil", "No fue posible generar el enlace del perfil.");
+        return;
       }
-    );
-  } catch (error) {
-    Alert.alert("Error", "No fue posible abrir las opciones para compartir.");
-  }
-};
+
+      const nombre = perfil?.nombre?.trim() || "Usuario";
+      const perfilUrl = `${API_HOST}/perfil/${perfil.id}`;
+      const mensaje = `Mira el perfil de ${nombre} en Tu Mercado SENA:\n${perfilUrl}`;
+
+      await Share.share(
+        {
+          title: `Perfil de ${nombre}`,
+          message: mensaje,
+        },
+        {
+          dialogTitle: `Compartir perfil de ${nombre}`,
+          subject: `Perfil de ${nombre}`,
+        }
+      );
+    } catch (error) {
+      Alert.alert("Error", "No fue posible abrir las opciones para compartir.");
+    }
+  };
 
   const abrirImagenPerfil = () => {
     setMostrarImagenPerfil(true);
@@ -181,6 +188,59 @@ const ProfileScreen = () => {
 
   const cerrarImagenPerfil = () => {
     setMostrarImagenPerfil(false);
+  };
+
+  const mapearPerfil = (data: any): UsuarioPerfil => {
+    const fotoOriginal =
+      data?.imagen ??
+      data?.foto_url ??
+      data?.imagen_url ??
+      data?.foto ??
+      data?.usuario?.imagen ??
+      data?.usuario?.foto_url ??
+      data?.usuario?.imagen_url ??
+      data?.usuario?.foto ??
+      data?.vendedor?.imagen ??
+      data?.vendedor?.foto_url ??
+      data?.vendedor?.imagen_url ??
+      data?.vendedor?.foto ??
+      null;
+
+    return {
+      id: data?.id ?? data?.usuario?.id ?? data?.vendedor?.id,
+      nombre:
+        data?.nickname ??
+        data?.nombre ??
+        data?.usuario?.nickname ??
+        data?.usuario?.nombre ??
+        data?.vendedor?.nickname ??
+        data?.vendedor?.nombre ??
+        "Sin nombre",
+      descripcion:
+        data?.descripcion ??
+        data?.usuario?.descripcion ??
+        data?.vendedor?.descripcion ??
+        "Este usuario no ha agregado una descripción.",
+      red_social:
+        data?.link ??
+        data?.red_social ??
+        data?.usuario?.link ??
+        data?.usuario?.red_social ??
+        data?.vendedor?.link ??
+        data?.vendedor?.red_social ??
+        null,
+      foto_url: normalizarUrlImagen(fotoOriginal),
+    };
+  };
+
+  const mapearProductos = (lista: any[]): Producto[] => {
+    return lista.map((item: any) => ({
+      id: item.id,
+      nombre: item.nombre,
+      descripcion: item.descripcion,
+      precio: item.precio,
+      imagen_url: item?.fotos?.[0]?.url || null,
+    }));
   };
 
   const cargarPerfilYProductos = useCallback(async () => {
@@ -194,7 +254,7 @@ const ProfileScreen = () => {
 
       setLoading(true);
 
-      const perfilResponse = await fetch(`${API_BASE_URL}/auth/me`, {
+      const meResponse = await fetch(`${API_BASE_URL}/auth/me`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -202,47 +262,46 @@ const ProfileScreen = () => {
         },
       });
 
-      const perfilData = await perfilResponse.json().catch(() => null);
+      const meData = await meResponse.json().catch(() => null);
 
-      if (!perfilResponse.ok) {
-        throw new Error(perfilData?.message || "No se pudo cargar el perfil.");
+      if (!meResponse.ok) {
+        throw new Error(meData?.message || "No se pudo cargar la información del usuario.");
       }
 
-      const fotoOriginal =
-        perfilData?.data?.imagen ??
-        perfilData?.imagen ??
-        perfilData?.data?.foto_url ??
-        perfilData?.foto_url ??
-        perfilData?.data?.imagen_url ??
-        perfilData?.imagen_url ??
-        perfilData?.data?.foto ??
-        perfilData?.foto ??
-        null;
+      const miId = meData?.data?.id ?? meData?.id ?? null;
+      setMiUsuarioId(miId);
 
-      const usuario: UsuarioPerfil = {
-        id: perfilData?.data?.id ?? perfilData?.id,
-        nombre:
-          perfilData?.data?.nickname ??
-          perfilData?.nickname ??
-          perfilData?.data?.nombre ??
-          perfilData?.nombre ??
-          "Sin nombre",
-        descripcion:
-          perfilData?.data?.descripcion ??
-          perfilData?.descripcion ??
-          "Este usuario no ha agregado una descripción.",
-        red_social:
-          perfilData?.data?.link ??
-          perfilData?.link ??
-          perfilData?.data?.red_social ??
-          perfilData?.red_social ??
-          null,
-        foto_url: normalizarUrlImagen(fotoOriginal),
-      };
+      if (!userIdNumber || (miId !== null && Number(userIdNumber) === Number(miId))) {
+        const usuario = mapearPerfil(meData?.data ?? meData);
+        setPerfil(usuario);
 
-      setPerfil(usuario);
+        const productosResponse = await fetch(`${API_BASE_URL}/mis-productos`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      const productosResponse = await fetch(`${API_BASE_URL}/mis-productos`, {
+        const productosData = await productosResponse.json().catch(() => null);
+
+        if (!productosResponse.ok) {
+          throw new Error(
+            productosData?.message || "No se pudieron cargar los productos."
+          );
+        }
+
+        const lista = Array.isArray(productosData)
+          ? productosData
+          : Array.isArray(productosData?.data)
+          ? productosData.data
+          : [];
+
+        setProductos(mapearProductos(lista));
+        return;
+      }
+
+      const perfilExternoResponse = await fetch(`${API_BASE_URL}/vendedores/${userIdNumber}`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -250,31 +309,24 @@ const ProfileScreen = () => {
         },
       });
 
-      const productosData = await productosResponse.json().catch(() => null);
+      const perfilExternoData = await perfilExternoResponse.json().catch(() => null);
 
-      if (!productosResponse.ok) {
+      if (!perfilExternoResponse.ok) {
         throw new Error(
-          productosData?.message || "No se pudieron cargar los productos."
+          perfilExternoData?.message || "No se pudo cargar el perfil del vendedor."
         );
       }
 
-      const lista = Array.isArray(productosData)
-        ? productosData
-        : Array.isArray(productosData?.data)
-        ? productosData.data
+      const dataVendedor = perfilExternoData?.data ?? perfilExternoData;
+      setPerfil(mapearPerfil(dataVendedor));
+
+      const listaExterna = Array.isArray(dataVendedor?.productos)
+        ? dataVendedor.productos
+        : Array.isArray(dataVendedor?.vendedor?.productos)
+        ? dataVendedor.vendedor.productos
         : [];
 
-      const listaProductos: Producto[] = lista.map((item: any) => ({
-        id: item.id,
-        nombre: item.nombre,
-        descripcion: item.descripcion,
-        precio: item.precio,
-        imagen_url: normalizarUrlImagen(
-          item?.fotos?.[0]?.url || item.imagen_url || item.imagen || null
-        ),
-      }));
-
-      setProductos(listaProductos);
+      setProductos(mapearProductos(listaExterna));
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Ocurrió un error al cargar el perfil.");
     } finally {
@@ -282,7 +334,7 @@ const ProfileScreen = () => {
       setRefreshing(false);
       setProductoAccionandoId(null);
     }
-  }, []);
+  }, [userIdNumber]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -409,7 +461,7 @@ const ProfileScreen = () => {
           </View>
 
           <Text className="text-center font-Opensans-bold" style={{ fontSize: 18, marginTop: 6 }}>
-            TU PERFIL
+            {esMiPerfil ? "TU PERFIL" : "PERFIL DEL VENDEDOR"}
           </Text>
 
           <View className="items-center" style={{ marginTop: 22 }}>
@@ -494,42 +546,66 @@ const ProfileScreen = () => {
                 </View>
               )}
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  width: "100%",
-                  justifyContent: "space-between",
-                  marginTop: 18,
-                }}
-              >
-                <CustomButton
-                  variant="icon-only"
-                  color="sextary"
-                  onPress={compartirPerfil}
-                  icon={<Ionicons name="share-social" size={20} color="#fff" />}
-                />
+              {esMiPerfil ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    width: "100%",
+                    justifyContent: "space-between",
+                    marginTop: 18,
+                  }}
+                >
+                  <CustomButton
+                    variant="icon-only"
+                    color="sextary"
+                    onPress={compartirPerfil}
+                    icon={<Ionicons name="share-social" size={20} color="#fff" />}
+                  />
 
-                <CustomButton
-                  variant="icon-only"
-                  color="sextary"
-                  onPress={() => router.push("/editprofile" as any)}
-                  icon={<MaterialCommunityIcons name="account-edit" size={20} color="#fff" />}
-                />
+                  <CustomButton
+                    variant="icon-only"
+                    color="sextary"
+                    onPress={() => router.push("/editprofile" as any)}
+                    icon={<MaterialCommunityIcons name="account-edit" size={20} color="#fff" />}
+                  />
 
-                <CustomButton
-                  variant="icon-only"
-                  color="sextary"
-                  onPress={() => router.push("/")}
-                  icon={<Ionicons name="bag-outline" size={20} color="#fff" />}
-                />
+                  <CustomButton
+                    variant="icon-only"
+                    color="sextary"
+                    onPress={() => router.push("/" as any)}
+                    icon={<Ionicons name="bag-outline" size={20} color="#fff" />}
+                  />
 
-                <CustomButton
-                  variant="icon-only"
-                  color="sextary"
-                  onPress={() => router.push("/(tabs)/Chats")}
-                  icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
-                />
-              </View>
+                  <CustomButton
+                    variant="icon-only"
+                    color="sextary"
+                    onPress={() => router.push("/(tabs)/Chats" as any)}
+                    icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
+                  />
+                </View>
+              ) : (
+                <View style={{ marginTop: 18 }}>
+                  <Pressable
+                    style={{
+                      backgroundColor: "#16a34a",
+                      paddingVertical: 14,
+                      borderRadius: 14,
+                    }}
+                    onPress={() => router.push("/(tabs)/Chats" as any)}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        textAlign: "center",
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Chatear con el vendedor
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           </View>
 
@@ -543,12 +619,14 @@ const ProfileScreen = () => {
           />
 
           <Text className="text-center font-Opensans-bold" style={{ fontSize: 16, marginBottom: 8 }}>
-            Mis productos
+            {esMiPerfil ? "Mis productos" : "Productos publicados"}
           </Text>
 
           {productos.length === 0 ? (
             <Text style={{ textAlign: "center", color: "#6b7280", marginTop: 12 }}>
-              Aún no has publicado productos.
+              {esMiPerfil
+                ? "Aún no has publicado productos."
+                : "Este usuario aún no tiene productos publicados."}
             </Text>
           ) : (
             <View className="flex-row flex-wrap" style={{ marginTop: 6 }}>
@@ -557,7 +635,7 @@ const ProfileScreen = () => {
                   <View style={{ position: "relative" }}>
                     <CustomButton
                       variant="card"
-                      isOwner={true}
+                      isOwner={esMiPerfil}
                       source={producto.imagen_url ? { uri: producto.imagen_url } : undefined}
                       defaultImage={defaultProductImage}
                       price={formatearPrecio(producto.precio)}
@@ -569,27 +647,29 @@ const ProfileScreen = () => {
                       {producto.nombre}
                     </CustomButton>
 
-                    <Pressable
-                      onPress={() => abrirMenuProducto(producto)}
-                      style={{
-                        position: "absolute",
-                        top: 10,
-                        right: 10,
-                        width: 34,
-                        height: 34,
-                        borderRadius: 17,
-                        backgroundColor: "rgba(0,0,0,0.55)",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        zIndex: 20,
-                      }}
-                    >
-                      {productoAccionandoId === producto.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
-                      )}
-                    </Pressable>
+                    {esMiPerfil && (
+                      <Pressable
+                        onPress={() => abrirMenuProducto(producto)}
+                        style={{
+                          position: "absolute",
+                          top: 10,
+                          right: 10,
+                          width: 34,
+                          height: 34,
+                          borderRadius: 17,
+                          backgroundColor: "rgba(0,0,0,0.55)",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          zIndex: 20,
+                        }}
+                      >
+                        {productoAccionandoId === producto.id ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Ionicons name="ellipsis-vertical" size={18} color="#fff" />
+                        )}
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               ))}

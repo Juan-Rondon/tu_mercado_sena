@@ -20,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 const API_BASE_URL = "https://tumercadosena.shop";
 const defaultProductImage = require("../../assets/images/imagedefault.png");
+const defaultUserImage = require("../../assets/images/default_user.png");
 
 type ApiFoto = {
   id: number;
@@ -29,6 +30,8 @@ type ApiFoto = {
 type ApiVendedor = {
   id?: number;
   nickname?: string | null;
+  imagen?: string | null;
+  imagen_url?: string | null;
 };
 
 type ApiProducto = {
@@ -61,6 +64,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<any>(null);
   const [relatedProducts, setRelatedProducts] = useState<RelatedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -99,6 +103,10 @@ export default function ProductDetail() {
 
     if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
       return limpio;
+    }
+
+    if (limpio.startsWith("usuarios/")) {
+      return `${API_BASE_URL}/storage/${limpio}`;
     }
 
     if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
@@ -141,6 +149,21 @@ export default function ProductDetail() {
 
       const token = await getToken();
 
+      const meResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const meJson = await meResponse.json().catch(() => null);
+
+      if (meResponse.ok) {
+        const miId = meJson?.data?.id ?? meJson?.id ?? null;
+        setMyUserId(miId);
+      }
+
       const productResponse = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
         method: "GET",
         headers: {
@@ -170,14 +193,26 @@ export default function ProductDetail() {
               .filter(Boolean)
           : [];
 
+      const sellerImageUrl = normalizarUrlImagen(
+        p?.vendedor?.imagen_url || p?.vendedor?.imagen || null
+      );
+
+      const sellerId = p.vendedor?.id ?? p.vendedor_id ?? null;
+      const isOwner =
+        sellerId !== null &&
+        meJson &&
+        Number(sellerId) === Number(meJson?.data?.id ?? meJson?.id ?? null);
+
       setProduct({
         id: p.id,
         name: p.nombre,
         description: p.descripcion ?? "",
         price: formatCOP(Number(p.precio || 0)),
         seller: p.vendedor?.nickname ?? "Usuario",
-        sellerId: p.vendedor?.id ?? p.vendedor_id ?? null,
+        sellerId,
+        sellerImage: sellerImageUrl ? { uri: sellerImageUrl } : defaultUserImage,
         images,
+        isOwner,
       });
 
       const relatedResponse = await fetch(`${API_BASE_URL}/api/productos`, {
@@ -228,6 +263,27 @@ export default function ProductDetail() {
     const offsetX = event.nativeEvent.contentOffset.x;
     const currentIndex = Math.round(offsetX / width);
     setSelectedIndex(currentIndex);
+  };
+
+  const irAlPerfilVendedor = () => {
+    if (!product?.sellerId) return;
+
+    router.push({
+      pathname: "/profile",
+      params: { userId: String(product.sellerId) },
+    });
+  };
+
+  const irAEditarProducto = () => {
+    if (!product?.id) return;
+
+    router.push({
+      pathname: "/Vender" as any,
+      params: {
+        edit: "true",
+        productId: String(product.id),
+      },
+    });
   };
 
   if (loading) {
@@ -305,30 +361,99 @@ export default function ProductDetail() {
 
           <Text className="text-xl text-gray-700">{product.price}</Text>
 
-          <Text className="mt-4 text-gray-600">Vendido por:</Text>
+          <Text className="mt-4 text-lg font-semibold text-gray-800">
+            Descripción del producto
+          </Text>
 
-          <Text className="text-lg font-medium">{product.seller}</Text>
+          <Text className="mt-1 text-base text-gray-600">
+            {product.description?.trim()
+              ? product.description
+              : "Este producto no tiene descripción."}
+          </Text>
+
+          <Text className="mt-5 text-gray-600">Vendido por:</Text>
 
           <Pressable
+            onPress={irAlPerfilVendedor}
             style={{
-              marginTop: 18,
-              backgroundColor: "#16a34a",
-              paddingVertical: 14,
-              borderRadius: 14,
+              marginTop: 10,
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#F9FAFB",
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
             }}
-            onPress={() => router.push("/(tabs)/Chats")}
           >
-            <Text
+            <Image
+              source={product.sellerImage}
+              defaultSource={defaultUserImage}
               style={{
-                color: "white",
-                textAlign: "center",
-                fontSize: 18,
-                fontWeight: "600",
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: "#E5E7EB",
               }}
-            >
-              Chatear con el vendedor
-            </Text>
+              resizeMode="cover"
+            />
+
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={{ fontSize: 17, fontWeight: "600", color: "#111827" }}>
+                {product.seller}
+              </Text>
+              <Text style={{ fontSize: 14, color: "#6B7280", marginTop: 2 }}>
+                Ver perfil del vendedor
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </Pressable>
+
+          {product.isOwner ? (
+            <Pressable
+              style={{
+                marginTop: 18,
+                backgroundColor: "#1C65E3",
+                paddingVertical: 14,
+                borderRadius: 14,
+              }}
+              onPress={irAEditarProducto}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  textAlign: "center",
+                  fontSize: 18,
+                  fontWeight: "600",
+                }}
+              >
+                Editar producto
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={{
+                marginTop: 18,
+                backgroundColor: "#16a34a",
+                paddingVertical: 14,
+                borderRadius: 14,
+              }}
+              onPress={() => router.push("/(tabs)/Chats")}
+            >
+              <Text
+                style={{
+                  color: "white",
+                  textAlign: "center",
+                  fontSize: 18,
+                  fontWeight: "600",
+                }}
+              >
+                Chatear con el vendedor
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <Text className="text-xl font-bold mb-3" style={{ marginTop: 24 }}>
