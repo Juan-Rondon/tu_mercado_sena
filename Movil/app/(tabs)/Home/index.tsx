@@ -18,7 +18,7 @@ import {
   type ImageSourcePropType
 } from "react-native";
 
-const API_BASE_URL = "https://tumercadosena.shop";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 const defaultUserImage = require("../../../assets/images/default_user.png");
 
 type ApiProduct = {
@@ -68,7 +68,7 @@ const normalizarUrlImagen = (url?: string | null) => {
   }
 
   if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
-    return `https://tumercadosena.shop/${limpio.replace(/^\/+/, "")}`;
+    return `https://tumercadosena.shop/api${limpio.replace(/^\/+/, "")}`;
   }
 
   return limpio;
@@ -128,7 +128,7 @@ const HomeScreen = () => {
 
       if (!token) return;
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -167,7 +167,7 @@ const HomeScreen = () => {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/productos`, {
+      const res = await fetch(`${API_BASE_URL}/productos`, {
         method: "GET",
         headers: {
           Accept: "application/json",

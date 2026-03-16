@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "https://tumercadosena.shop";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 const defaultProductImage = require("../../assets/images/imagedefault.png");
 const defaultUserImage = require("../../assets/images/default_user.png");
 
@@ -57,7 +57,7 @@ type RelatedItem = {
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
 
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -73,6 +73,7 @@ export default function ProductDetail() {
 
   const imageHeight = Math.max(220, Math.min(320, width * 0.75));
   const cardWidth = Math.max(180, Math.min(220, width * 0.55));
+  const visibleRelatedProducts = relatedProducts.slice(0, 3);
 
   useEffect(() => {
     if (id) {
@@ -151,7 +152,7 @@ export default function ProductDetail() {
 
       const token = await getToken();
 
-      const meResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const meResponse = await fetch(`${API_BASE_URL}/auth/me`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -166,7 +167,7 @@ export default function ProductDetail() {
         setMyUserId(miId);
       }
 
-      const productResponse = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
+      const productResponse = await fetch(`${API_BASE_URL}/productos/${id}`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -192,7 +193,7 @@ export default function ProductDetail() {
                 const uri = normalizarUrlImagen(foto?.url);
                 return uri ? { uri } : null;
               })
-              .filter(Boolean)
+              .filter(Boolean) as { uri: string }[]
           : [];
 
       const sellerImageUrl = normalizarUrlImagen(
@@ -217,7 +218,7 @@ export default function ProductDetail() {
         isOwner,
       });
 
-      const relatedResponse = await fetch(`${API_BASE_URL}/api/productos`, {
+      const relatedResponse = await fetch(`${API_BASE_URL}/productos`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -288,6 +289,10 @@ export default function ProductDetail() {
     });
   };
 
+  const irAlHome = () => {
+    router.push("/(tabs)/Home" as any);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -312,7 +317,10 @@ export default function ProductDetail() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      edges={["top", "bottom"]}
+    >
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -497,7 +505,7 @@ export default function ProductDetail() {
             contentContainerStyle={{ paddingHorizontal: 4, paddingBottom: 8 }}
           >
             <View style={{ flexDirection: "row" }}>
-              {relatedProducts.map((item) => (
+              {visibleRelatedProducts.map((item) => (
                 <View key={item.id} style={{ width: cardWidth, marginRight: 12 }}>
                   <CustomButton
                     variant="card"
@@ -522,6 +530,59 @@ export default function ProductDetail() {
                   </CustomButton>
                 </View>
               ))}
+
+              <Pressable
+                onPress={irAlHome}
+                style={{
+                  width: cardWidth,
+                  marginRight: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.card,
+                  minHeight: 205,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 16,
+                  paddingVertical: 20,
+                }}
+              >
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor: colors.surface,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  <Ionicons name="grid-outline" size={26} color={colors.primary} />
+                </View>
+
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 17,
+                    fontWeight: "700",
+                    textAlign: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  Ver más...
+                </Text>
+
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 14,
+                    textAlign: "center",
+                  }}
+                >
+                  Ir al inicio para ver más productos
+                </Text>
+              </Pressable>
             </View>
           </ScrollView>
         )}

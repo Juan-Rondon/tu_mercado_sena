@@ -3,7 +3,7 @@ import axios from "axios";
 
 const api = axios.create({
   // baseURL: "http://192.168.1.13:8000/api", // ip 5g casa juan
-  baseURL: "https://tumercadosena.shop/api/",
+  baseURL: "https://tumercadosena.shop/api/api/",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -42,7 +42,7 @@ export const iniciarRegistroService = (payload: {
   notifica_push: boolean;
   uso_datos: boolean;
 }) => {
-  return api.post("api/auth/iniciar-registro", payload);
+  return api.post("auth/iniciar-registro", payload);
 };
 
 /* =========================

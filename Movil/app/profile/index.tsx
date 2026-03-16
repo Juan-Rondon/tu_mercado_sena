@@ -24,7 +24,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 const defaultProductImage = require("../../assets/images/imagedefault.png");
 const defaultUserImage = require("../../assets/images/default_user.png");
 
-const API_BASE_URL = "https://tumercadosena.shop/api";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 const API_HOST = "https://tumercadosena.shop";
 
 const ESTADO_ELIMINADO_ID = 3;

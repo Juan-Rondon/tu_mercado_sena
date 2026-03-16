@@ -12,7 +12,7 @@ import CustomInput from "@/components/inputs/CustomInput";
 import ResetPasswordSheet from "@/components/sheets/ResetPasswordSheet";
 import { saveToken } from "@/src/lib/authToken";
 
-const API_BASE_URL = "https://tumercadosena.shop";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 // const API_BASE_URL = "http://192.168.1.13:8000"; // casa juan 5g
 //const API_BASE_URL = "http://192.168.1.7:8000"; // ip jean
 // const API_BASE_URL = "http://192.168.18.4:8000"; IP Sebas
@@ -46,7 +46,7 @@ const LoginScreen = () => {
   try {
     setLoading(true);
 
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

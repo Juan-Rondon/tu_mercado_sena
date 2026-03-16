@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "https://tumercadosena.shop/api";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 const API_HOST = "https://tumercadosena.shop";
 
 type Subcategoria = {

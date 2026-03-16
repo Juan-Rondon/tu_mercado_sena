@@ -1,21 +1,21 @@
 {
   "expo": {
-    "name": "MercadoSena",
-    "slug": "MercadoSena",
+    "name": "Mercado Sena",
+    "slug": "mercado-sena",
     "version": "1.0.0",
     "orientation": "portrait",
-    // "icon": "./assets/images/icon.png",
     "scheme": "mercadosena",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.sena.mercadosena",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.sena.mercadosena",
       "adaptiveIcon": {
         "backgroundColor": "#2DC75C",
         "foregroundImage": "./assets/images/logo.png",
-        // "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/logo-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
@@ -46,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "51d9c065-0871-4b6d-8c9f-0cc2128b4806"
+      }
     }
   }
 }
