@@ -1,56 +1,208 @@
+import { useAppTheme } from "@/src/theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function ModoOscuro() {
   const router = useRouter();
-  const [darkMode, setDarkMode] = useState(false);
+  const { themeMode, resolvedTheme, colors, setThemeMode } = useAppTheme();
+
+  const opciones: {
+    key: "light" | "dark" | "system";
+    titulo: string;
+    descripcion: string;
+    icono: keyof typeof Ionicons.glyphMap;
+  }[] = [
+    {
+      key: "light",
+      titulo: "Claro",
+      descripcion: "La aplicación siempre se verá en modo claro.",
+      icono: "sunny-outline",
+    },
+    {
+      key: "dark",
+      titulo: "Oscuro",
+      descripcion: "La aplicación siempre se verá en modo oscuro.",
+      icono: "moon-outline",
+    },
+    {
+      key: "system",
+      titulo: "Automático",
+      descripcion: "La aplicación seguirá la configuración del celular.",
+      icono: "phone-portrait-outline",
+    },
+  ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#D1D5DB" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-
-        {/* HEADER */}
-        <View className="flex-row items-center mt-6 mb-6">
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 24,
+            marginBottom: 24,
+          }}
+        >
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={26} color="black" />
+            <Ionicons name="arrow-back" size={26} color={colors.text} />
           </TouchableOpacity>
 
-          <Text className="text-black text-xl font-bold ml-4 flex-1 text-center">
-            Modo oscuro
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 20,
+              fontWeight: "700",
+              marginLeft: 16,
+              flex: 1,
+              textAlign: "center",
+              marginRight: 26,
+            }}
+          >
+            Apariencia
           </Text>
         </View>
 
-        {/* TARJETA */}
-        <View className="bg-white rounded-2xl p-4 shadow">
+        <View
+          style={{
+            backgroundColor: colors.card,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: colors.border,
+            overflow: "hidden",
+          }}
+        >
+          {opciones.map((opcion, index) => {
+            const activa = themeMode === opcion.key;
 
-          <View className="flex-row justify-between items-center">
-            <View className="flex-1 pr-4">
-              <Text className="text-base font-semibold text-gray-900">
-                Activar modo oscuro
-              </Text>
-              <Text className="text-sm text-gray-500">
-                Cambia la apariencia de la aplicación
-              </Text>
-            </View>
+            return (
+              <TouchableOpacity
+                key={opcion.key}
+                onPress={() => setThemeMode(opcion.key)}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 16,
+                  borderBottomWidth: index !== opciones.length - 1 ? 1 : 0,
+                  borderBottomColor: colors.border,
+                  backgroundColor: activa ? colors.surface : colors.card,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 21,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: activa ? colors.primary : colors.surface,
+                      marginRight: 14,
+                    }}
+                  >
+                    <Ionicons
+                      name={opcion.icono}
+                      size={20}
+                      color={activa ? "#FFFFFF" : colors.text}
+                    />
+                  </View>
 
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: "#CBD5F5", true: "#2563EB" }}
-              thumbColor={darkMode ? "#FFFFFF" : "#F4F4F4"}
-            />
-          </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "700",
+                        color: colors.text,
+                      }}
+                    >
+                      {opcion.titulo}
+                    </Text>
 
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        color: colors.textMuted,
+                        marginTop: 4,
+                        lineHeight: 18,
+                      }}
+                    >
+                      {opcion.descripcion}
+                    </Text>
+                  </View>
+
+                  {activa && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color={colors.primary}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* TEXTO INFERIOR */}
-        <Text className="text-gray-600 text-sm mt-6">
-          Al activar el modo oscuro, se reducirá el brillo de la interfaz
-          para una experiencia más cómoda.
-        </Text>
+        <View
+          style={{
+            marginTop: 24,
+            backgroundColor: colors.card,
+            borderRadius: 16,
+            padding: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 15,
+              fontWeight: "700",
+              marginBottom: 8,
+            }}
+          >
+            Estado actual
+          </Text>
 
+          <Text
+            style={{
+              color: colors.textMuted,
+              fontSize: 14,
+              lineHeight: 20,
+            }}
+          >
+            Preferencia seleccionada:{" "}
+            <Text style={{ color: colors.text, fontWeight: "700" }}>
+              {themeMode === "light"
+                ? "Claro"
+                : themeMode === "dark"
+                ? "Oscuro"
+                : "Automático"}
+            </Text>
+            {"\n"}
+            Tema aplicado ahora mismo:{" "}
+            <Text style={{ color: colors.text, fontWeight: "700" }}>
+              {resolvedTheme === "dark" ? "Oscuro" : "Claro"}
+            </Text>
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 14,
+            marginTop: 24,
+            lineHeight: 20,
+          }}
+        >
+          En modo automático, la aplicación seguirá la apariencia configurada en
+          tu dispositivo. En modo claro u oscuro, la app usará siempre ese tema
+          sin importar la configuración del celular.
+        </Text>
       </ScrollView>
     </View>
   );

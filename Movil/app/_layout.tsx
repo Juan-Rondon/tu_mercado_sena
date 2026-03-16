@@ -1,34 +1,73 @@
+import { ThemeProvider, useAppTheme } from "@/src/theme/ThemeProvider";
 import { useFonts } from "expo-font";
-import { SplashScreen, Stack } from "expo-router";
-import { useEffect } from "react";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
+import SplashAnimated from "../components/splash/SplashAnimated";
 import "./global.css";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
-const RootLayout = () => {
-    const [fontsLoaded, error] = useFonts({
-        'OpenSans-Bold': require('../assets/fonts/OpenSans-Bold.ttf'),
-        'OpenSans-Light': require('../assets/fonts/OpenSans-Light.ttf'),
-        'OpenSans-Medium': require('../assets/fonts/OpenSans-Medium.ttf'),
-    });
-    
-    useEffect(() => {
-      if (error) throw error;
+function RootNavigator() {
+  const { isDark, colors } = useAppTheme();
 
-      if (fontsLoaded) SplashScreen.hideAsync();
-     
-    }, [fontsLoaded, error]);
-    
-    if (!fontsLoaded && !error) return null;
+  const [fontsLoaded, fontError] = useFonts({
+    "OpenSans-Bold": require("../assets/fonts/OpenSans-Bold.ttf"),
+    "OpenSans-Light": require("../assets/fonts/OpenSans-Light.ttf"),
+    "OpenSans-Medium": require("../assets/fonts/OpenSans-Medium.ttf"),
+  });
 
-    return (
-      <Stack
-        screenOptions={{
-          animation: "slide_from_right",
-          headerShown: false,
-        }}
-      />
-    );
+  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+  const [nativeSplashHidden, setNativeSplashHidden] = useState(false);
+
+  useEffect(() => {
+    if (fontError) throw fontError;
+  }, [fontError]);
+
+  useEffect(() => {
+    const hideNativeSplash = async () => {
+      if (fontsLoaded && !nativeSplashHidden) {
+        await SplashScreen.hideAsync();
+        setNativeSplashHidden(true);
+      }
+    };
+
+    hideNativeSplash();
+  }, [fontsLoaded, nativeSplashHidden]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+      }}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} />
+
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="welcome" options={{ animation: "none" }} />
+        <Stack.Screen name="login" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="register" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="(tabs)" options={{ animation: "slide_from_right" }} />
+      </Stack>
+
+      {showAnimatedSplash && (
+        <SplashAnimated onFinish={() => setShowAnimatedSplash(false)} />
+      )}
+    </View>
+  );
 }
 
-export default RootLayout
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootNavigator />
+    </ThemeProvider>
+  );
+}

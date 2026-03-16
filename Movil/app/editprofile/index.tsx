@@ -6,19 +6,21 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    RefreshControl,
-    ScrollView,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-const API_BASE_URL = "http://192.168.1.2:8000/api";
+const API_BASE_URL = "https://tumercadosena.shop/api";
 const defaultUserImage = require("../../assets/images/default_user.png");
 
 type PerfilResponse = {
@@ -71,7 +73,7 @@ const EditProfileScreen = () => {
     }
 
     if (limpio.startsWith("/storage/")) {
-      return `http://192.168.1.2:8000${limpio}`;
+      return `https://tumercadosena.shop${limpio}`;
     }
 
     return limpio;
@@ -341,228 +343,239 @@ const EditProfileScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }} edges={["top", "bottom"]}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: 12,
-          paddingBottom: 24 + insets.bottom,
-        }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        <View style={{ marginBottom: 8, alignItems: "flex-start" }}>
-          <CustomButton
-            variant="text-only"
-            color="secondary"
-            FontText="text-xl"
-            onPress={confirmarSalida}
-            icon={<Ionicons name="arrow-back" size={20} color="#1C65E3" />}
-            iconPosition="left"
-          >
-            Volver
-          </CustomButton>
-        </View>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 120 + insets.bottom,
+          }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <View style={{ marginBottom: 8, alignItems: "flex-start" }}>
+            <CustomButton
+              variant="text-only"
+              color="secondary"
+              FontText="text-xl"
+              onPress={confirmarSalida}
+              icon={<Ionicons name="arrow-back" size={20} color="#1C65E3" />}
+              iconPosition="left"
+            >
+              Volver
+            </CustomButton>
+          </View>
 
-        <Text className="text-center font-Opensans-bold" style={{ fontSize: 18, marginTop: 6 }}>
-          EDITAR PERFIL
-        </Text>
+          <Text className="text-center font-Opensans-bold" style={{ fontSize: 18, marginTop: 6 }}>
+            EDITAR PERFIL
+          </Text>
 
-        <View style={{ alignItems: "center", marginTop: 24 }}>
-          <View
-            style={{
-              width: avatarBox.size,
-              height: avatarBox.size,
-              position: "relative",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
+          <View style={{ alignItems: "center", marginTop: 24 }}>
             <View
               style={{
                 width: avatarBox.size,
                 height: avatarBox.size,
-                borderRadius: avatarBox.size / 2,
-                backgroundColor: "#E5E7EB",
-                justifyContent: "center",
+                position: "relative",
                 alignItems: "center",
-                overflow: "hidden",
+                justifyContent: "center",
               }}
             >
-              {nuevaFoto ? (
-                <Image
-                  source={{ uri: nuevaFoto.uri }}
-                  style={{ width: "100%", height: "100%" }}
-                  resizeMode="cover"
-                />
-              ) : fotoActual ? (
-                <Image
-                  source={{ uri: fotoActual }}
-                  style={{ width: "100%", height: "100%" }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Image
-                  source={defaultUserImage}
-                  style={{ width: avatarBox.img, height: avatarBox.img }}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-
-            <View
-              style={{
-                position: "absolute",
-                right: 2,
-                bottom: 2,
-                zIndex: 30,
-                elevation: 10,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-              }}
-            >
-              <CustomButton
-                variant="icon-only"
-                color="sextary"
-                onPress={mostrarOpcionesImagen}
-                icon={<Ionicons name="camera-outline" size={18} color="#fff" />}
-              />
-            </View>
-          </View>
-
-          <Text
-            style={{
-              marginTop: 12,
-              color: "#6B7280",
-              fontSize: 13,
-              textAlign: "center",
-            }}
-          >
-            Toca el ícono para cambiar la foto
-          </Text>
-        </View>
-
-        <View style={{ marginTop: 28, gap: 16 }}>
-          <View>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: "#111827",
-                marginBottom: 8,
-              }}
-            >
-              Nickname
-            </Text>
-
-            <CustomInput
-              type="text"
-              value={nickname}
-              onChangeText={setNickname}
-              placeholder="Escribe tu nickname"
-              containerStyle={{
-                borderRadius: 14,
-                backgroundColor: "#F5F5F7",
-              }}
-              icon={<MaterialCommunityIcons name="account-outline" size={20} color="#9CA3AF" />}
-            />
-          </View>
-
-          <View>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: "#111827",
-                marginBottom: 8,
-              }}
-            >
-              Descripción
-            </Text>
-
-            <View
-              style={{
-                backgroundColor: "#F5F5F7",
-                borderRadius: 14,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-              }}
-            >
-              <TextInput
-                value={descripcion}
-                onChangeText={setDescripcion}
-                placeholder="Cuéntanos algo sobre ti"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
+              <View
                 style={{
-                  minHeight: 110,
-                  fontSize: 16,
-                  color: "#1a202a",
+                  width: avatarBox.size,
+                  height: avatarBox.size,
+                  borderRadius: avatarBox.size / 2,
+                  backgroundColor: "#E5E7EB",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  overflow: "hidden",
                 }}
+              >
+                {nuevaFoto ? (
+                  <Image
+                    source={{ uri: nuevaFoto.uri }}
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="cover"
+                  />
+                ) : fotoActual ? (
+                  <Image
+                    source={{ uri: fotoActual }}
+                    style={{ width: "100%", height: "100%" }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={defaultUserImage}
+                    style={{ width: avatarBox.img, height: avatarBox.img }}
+                    resizeMode="contain"
+                  />
+                )}
+              </View>
+
+              <View
+                style={{
+                  position: "absolute",
+                  right: 2,
+                  bottom: 2,
+                  zIndex: 30,
+                  elevation: 10,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                }}
+              >
+                <CustomButton
+                  variant="icon-only"
+                  color="sextary"
+                  onPress={mostrarOpcionesImagen}
+                  icon={<Ionicons name="camera-outline" size={18} color="#fff" />}
+                />
+              </View>
+            </View>
+
+            <Text
+              style={{
+                marginTop: 12,
+                color: "#6B7280",
+                fontSize: 13,
+                textAlign: "center",
+              }}
+            >
+              Toca el ícono para cambiar la foto
+            </Text>
+          </View>
+
+          <View style={{ marginTop: 28, gap: 16 }}>
+            <View>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Nickname
+              </Text>
+
+              <CustomInput
+                type="text"
+                value={nickname}
+                onChangeText={setNickname}
+                placeholder="Escribe tu nickname"
+                containerStyle={{
+                  borderRadius: 14,
+                  backgroundColor: "#F5F5F7",
+                }}
+                icon={<MaterialCommunityIcons name="account-outline" size={20} color="#9CA3AF" />}
+              />
+            </View>
+
+            <View>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Descripción
+              </Text>
+
+              <View
+                style={{
+                  backgroundColor: "#F5F5F7",
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                }}
+              >
+                <TextInput
+                  value={descripcion}
+                  onChangeText={setDescripcion}
+                  placeholder="Cuéntanos algo sobre ti"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  style={{
+                    minHeight: 110,
+                    fontSize: 16,
+                    color: "#1a202a",
+                  }}
+                />
+              </View>
+            </View>
+
+            <View>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "600",
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Red social o enlace
+              </Text>
+
+              <CustomInput
+                type="text"
+                value={link}
+                onChangeText={setLink}
+                placeholder="https://instagram.com/tuusuario"
+                autoCapitalize="none"
+                containerStyle={{
+                  borderRadius: 14,
+                  backgroundColor: "#F5F5F7",
+                }}
+                icon={<Ionicons name="link-outline" size={20} color="#9CA3AF" />}
               />
             </View>
           </View>
 
-          <View>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: "600",
-                color: "#111827",
-                marginBottom: 8,
-              }}
+          <View style={{ marginTop: 28, gap: 12 }}>
+            <CustomButton
+              className="rounded-r-full rounded-l-full p-4"
+              color="sextary"
+              onPress={guardarCambios}
+              disabled={saving}
+              icon={
+                saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="content-save-outline"
+                    size={18}
+                    color="#000000"
+                  />
+                )
+              }
+              iconPosition="left"
             >
-              Red social o enlace
-            </Text>
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </CustomButton>
 
-            <CustomInput
-              type="text"
-              value={link}
-              onChangeText={setLink}
-              placeholder="https://instagram.com/tuusuario"
-              autoCapitalize="none"
-              containerStyle={{
-                borderRadius: 14,
-                backgroundColor: "#F5F5F7",
-              }}
-              icon={<Ionicons name="link-outline" size={20} color="#9CA3AF" />}
-            />
+            <CustomButton
+              className="rounded-r-full rounded-l-full p-4"
+              color="gray"
+              onPress={confirmarSalida}
+              FontText="text-base"
+            >
+              Cancelar
+            </CustomButton>
           </View>
-        </View>
-
-        <View style={{ marginTop: 28, gap: 12 }}>
-          <CustomButton
-            color="sextary"
-            onPress={guardarCambios}
-            disabled={saving}
-            icon={
-              saving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons
-                  name="content-save-outline"
-                  size={18}
-                  color="#000000"
-                />
-              )
-            }
-            iconPosition="left"
-          >
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </CustomButton>
-
-          <CustomButton
-            color="gray"
-            onPress={confirmarSalida}
-            FontText="text-base"
-          >
-            Cancelar
-          </CustomButton>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
