@@ -6,7 +6,7 @@ import {
 } from "@/src/lib/pendingRegister";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -21,7 +21,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 // const API_BASE_URL = "http://192.168.1.13:8000"; // ip 5g casa juan
-const API_BASE_URL = "https://tumercadosena.shop";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -76,7 +76,7 @@ export default function VerifyScreen() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -128,7 +128,7 @@ export default function VerifyScreen() {
       setResending(true);
 
       const res = await fetch(
-        `${API_BASE_URL}/api/auth/reenviar-clave-registro`,
+        `${API_BASE_URL}/auth/reenviar-clave-registro`,
         {
           method: "POST",
           headers: {

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -22,7 +22,7 @@ import ResetPasswordSheet from "@/components/sheets/ResetPasswordSheet";
 import { savePendingRegister } from "@/src/lib/pendingRegister";
 
 // const API_BASE_URL = "http://192.168.1.13:8000"; // ip 5g casa juan
-const API_BASE_URL = "https://tumercadosena.shop";
+const API_BASE_URL = "https://tumercadosena.shop/api/api";
 
 const RegisterScreen = () => {
   const router = useRouter();
@@ -106,7 +106,7 @@ const RegisterScreen = () => {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/iniciar-registro`, {
+      const res = await fetch(`${API_BASE_URL}/auth/iniciar-registro`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
