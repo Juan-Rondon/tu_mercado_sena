@@ -2,7 +2,7 @@ import CustomButton from "@/components/buttons/CustomButton";
 import SearchBar from "@/components/inputs/SearchBar";
 import { getToken } from "@/src/lib/authToken";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import {
   Text,
   View,
   useWindowDimensions,
-  type ImageSourcePropType
+  type ImageSourcePropType,
 } from "react-native";
 
 const API_BASE_URL = "https://tumercadosena.shop/api/api";
@@ -34,7 +34,8 @@ type ApiProduct = {
   };
   fotos?: {
     id: number;
-    url: string;
+    url?: string;
+    imagen?: string;
   }[];
 };
 
@@ -52,6 +53,23 @@ type Item = {
   imageSource?: ImageSourcePropType;
 };
 
+type PaginationResponse = {
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+};
+
+type ProductosResponse = {
+  success?: boolean;
+  message?: string;
+  data?: ApiProduct[];
+  pagination?: PaginationResponse;
+};
+
+const PAGE_SIZE = 15;
+const API_HOST = "https://tumercadosena.shop";
+
 const formatCOP = (n: number) =>
   n.toLocaleString("es-CO", { style: "currency", currency: "COP" });
 
@@ -67,8 +85,20 @@ const normalizarUrlImagen = (url?: string | null) => {
     return limpio;
   }
 
-  if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
-    return `https://tumercadosena.shop/api${limpio.replace(/^\/+/, "")}`;
+  if (limpio.startsWith("/storage/")) {
+    return `${API_HOST}${limpio}`;
+  }
+
+  if (limpio.startsWith("storage/")) {
+    return `${API_HOST}/${limpio}`;
+  }
+
+  if (limpio.startsWith("productos/")) {
+    return `${API_HOST}/storage/${limpio}`;
+  }
+
+  if (limpio.startsWith("/productos/")) {
+    return `${API_HOST}/storage${limpio}`;
   }
 
   return limpio;
@@ -79,12 +109,15 @@ const mapProductosAItems = (productos: ApiProduct[]): Item[] => {
     let imageUrl: string | null = null;
 
     if (Array.isArray(p.fotos) && p.fotos.length > 0) {
-      imageUrl = normalizarUrlImagen(p.fotos[0].url);
+      const foto = p.fotos[0];
+      imageUrl = normalizarUrlImagen(
+        foto?.url ?? (foto?.imagen ? `productos/${p.id}/${foto.imagen}` : null)
+      );
     }
 
     const imageSource: ImageSourcePropType | undefined = imageUrl
-  ? { uri: imageUrl }
-  : undefined;
+      ? { uri: imageUrl }
+      : undefined;
 
     return {
       id: String(p.id),
@@ -104,13 +137,20 @@ const HomeScreen = () => {
 
   const [rawProducts, setRawProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [userImage, setUserImage] = useState<string | null>(null);
 
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
   const router = useRouter();
   const { width } = useWindowDimensions();
+
+  const onEndReachedCalledDuringMomentum = useRef(false);
 
   const numColumns = width >= 1024 ? 4 : width >= 768 ? 3 : 2;
 
@@ -148,15 +188,19 @@ const HomeScreen = () => {
       };
 
       setUserImage(normalizarUrlImagen(perfil.imagen));
-    } catch (error) {
+    } catch {
       console.log("No se pudo cargar el perfil en home");
     }
   };
 
-  const fetchProducts = async (mode: "init" | "refresh" = "init") => {
+  const fetchProducts = async (
+    pageToLoad: number,
+    mode: "init" | "refresh" | "loadMore" = "init"
+  ) => {
     try {
       if (mode === "init") setLoading(true);
       if (mode === "refresh") setRefreshing(true);
+      if (mode === "loadMore") setLoadingMore(true);
 
       setErrorMsg(null);
 
@@ -167,44 +211,70 @@ const HomeScreen = () => {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/productos`, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/productos?page=${pageToLoad}&per_page=${PAGE_SIZE}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      const json = await res.json().catch(() => null);
+      const json: ProductosResponse | null = await res.json().catch(() => null);
 
       if (!res.ok) {
         setErrorMsg(json?.message || `Error ${res.status}`);
         return;
       }
 
-      const list: ApiProduct[] = Array.isArray(json)
-        ? json
-        : Array.isArray(json?.data)
-        ? json.data
-        : [];
+      const list = Array.isArray(json?.data) ? json.data : [];
+      const pagination = json?.pagination;
 
-      setRawProducts(list);
-    } catch (e) {
+      const currentPage = Number(pagination?.current_page ?? pageToLoad);
+      const serverLastPage = Number(pagination?.last_page ?? pageToLoad);
+
+      setPage(currentPage);
+      setLastPage(serverLastPage);
+      setHasMore(currentPage < serverLastPage);
+
+      if (mode === "loadMore") {
+        setRawProducts((prev) => {
+          const existentes = new Set(prev.map((p) => p.id));
+          const nuevos = list.filter((p) => !existentes.has(p.id));
+          return [...prev, ...nuevos];
+        });
+      } else {
+        setRawProducts(list);
+      }
+    } catch {
       setErrorMsg("No fue posible conectar con el servidor.");
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts("init");
+    fetchProducts(1, "init");
     fetchPerfil();
   }, []);
 
   const onRefresh = () => {
-    fetchProducts("refresh");
+    setPage(1);
+    setLastPage(1);
+    setHasMore(true);
+    fetchProducts(1, "refresh");
     fetchPerfil();
+  };
+
+  const handleLoadMore = () => {
+    if (loading || loadingMore || refreshing || !hasMore) return;
+    if (page >= lastPage) return;
+
+    fetchProducts(page + 1, "loadMore");
   };
 
   const limpiarFiltros = () => {
@@ -241,11 +311,7 @@ const HomeScreen = () => {
         const desc = (p.descripcion ?? "").toLowerCase();
         const categoria = (p.categoria?.nombre ?? "").toLowerCase();
 
-        return (
-          nombre.includes(q) ||
-          desc.includes(q) ||
-          categoria.includes(q)
-        );
+        return nombre.includes(q) || desc.includes(q) || categoria.includes(q);
       });
     }
 
@@ -306,7 +372,7 @@ const HomeScreen = () => {
         {errorMsg ? (
           <Text
             style={{ marginTop: 12, color: "#2563EB", fontWeight: "600" }}
-            onPress={() => fetchProducts("init")}
+            onPress={() => fetchProducts(1, "init")}
           >
             Reintentar
           </Text>
@@ -335,6 +401,16 @@ const HomeScreen = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReachedThreshold={0.4}
+        onMomentumScrollBegin={() => {
+          onEndReachedCalledDuringMomentum.current = false;
+        }}
+        onEndReached={() => {
+          if (!onEndReachedCalledDuringMomentum.current) {
+            handleLoadMore();
+            onEndReachedCalledDuringMomentum.current = true;
+          }
+        }}
         ListHeaderComponent={
           <View style={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 8 }}>
             <View style={styles.searchRow}>
@@ -514,6 +590,19 @@ const HomeScreen = () => {
               <ActivityIndicator />
               <Text style={{ marginTop: 10, color: "#6B7280" }}>
                 Cargando productos...
+              </Text>
+            </View>
+          ) : loadingMore ? (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <ActivityIndicator />
+              <Text style={{ marginTop: 8, color: "#6B7280" }}>
+                Cargando más productos...
+              </Text>
+            </View>
+          ) : !hasMore && rawProducts.length > 0 ? (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <Text style={{ color: "#9CA3AF" }}>
+                Ya no hay más productos para mostrar.
               </Text>
             </View>
           ) : (
