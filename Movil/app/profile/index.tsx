@@ -81,10 +81,15 @@ const ProfileScreen = () => {
     return { size, img };
   }, [width]);
 
-  const userIdNumber = userId ? Number(userId) : null;
-  const viendoPerfilExterno = !!userIdNumber;
+  const parsedUserId = Number(userId);
+  const userIdNumber =
+    userId && Number.isFinite(parsedUserId) && parsedUserId > 0 ? parsedUserId : null;
+
+  const viendoPerfilExterno = userIdNumber !== null;
   const esMiPerfil =
-    !viendoPerfilExterno || (miUsuarioId !== null && userIdNumber === miUsuarioId);
+    miUsuarioId === null
+      ? !viendoPerfilExterno
+      : !viendoPerfilExterno || Number(userIdNumber) === Number(miUsuarioId);
 
   const formatearPrecio = (valor: number | string) => {
     const numero = Number(valor || 0);
@@ -97,18 +102,21 @@ const ProfileScreen = () => {
 
   const normalizarUrl = (url?: string | null) => {
     if (!url) return "";
-    const limpio = url.trim();
+
+    const limpio = String(url).trim().replace(/\s+/g, "");
     if (!limpio) return "";
-    if (limpio.startsWith("http://") || limpio.startsWith("https://")) {
-      return limpio;
+
+    if (/^https?:\/\//i.test(limpio)) {
+      return encodeURI(limpio);
     }
-    return `https://${limpio}`;
+
+    return encodeURI(`https://${limpio}`);
   };
 
   const normalizarUrlImagen = (url?: string | null) => {
     if (!url) return null;
 
-    const limpio = url.trim();
+    const limpio = String(url).trim();
     if (!limpio) return null;
 
     if (
@@ -160,18 +168,18 @@ const ProfileScreen = () => {
 
   const abrirRedSocial = async () => {
     const url = normalizarUrl(perfil?.red_social);
+
     if (!url) {
       Alert.alert("Red social", "Este usuario no tiene un enlace registrado.");
       return;
     }
 
-    const supported = await Linking.canOpenURL(url);
-    if (!supported) {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      console.error("Error abriendo red social:", error);
       Alert.alert("Enlace inválido", "No fue posible abrir el enlace registrado.");
-      return;
     }
-
-    await Linking.openURL(url);
   };
 
   const compartirPerfil = async () => {
@@ -201,6 +209,7 @@ const ProfileScreen = () => {
   };
 
   const abrirImagenPerfil = () => {
+    if (!perfil?.foto_url) return;
     setMostrarImagenPerfil(true);
   };
 
@@ -222,10 +231,18 @@ const ProfileScreen = () => {
       data?.vendedor?.foto_url ??
       data?.vendedor?.imagen_url ??
       data?.vendedor?.foto ??
+      data?.usuario_votado?.imagen ??
       null;
 
     return {
-      id: data?.id ?? data?.usuario?.id ?? data?.vendedor?.id,
+      id:
+        Number(
+          data?.id ??
+            data?.usuario?.id ??
+            data?.vendedor?.id ??
+            data?.usuario_votado?.id ??
+            0
+        ) || 0,
       nombre:
         data?.nickname ??
         data?.nombre ??
@@ -233,11 +250,14 @@ const ProfileScreen = () => {
         data?.usuario?.nombre ??
         data?.vendedor?.nickname ??
         data?.vendedor?.nombre ??
+        data?.usuario_votado?.nickname ??
+        data?.usuario_votado?.nombre ??
         "Sin nombre",
       descripcion:
         data?.descripcion ??
         data?.usuario?.descripcion ??
         data?.vendedor?.descripcion ??
+        data?.usuario_votado?.descripcion ??
         "Este usuario no ha agregado una descripción.",
       red_social:
         data?.link ??
@@ -246,6 +266,8 @@ const ProfileScreen = () => {
         data?.usuario?.red_social ??
         data?.vendedor?.link ??
         data?.vendedor?.red_social ??
+        data?.usuario_votado?.link ??
+        data?.usuario_votado?.red_social ??
         null,
       foto_url: normalizarUrlImagen(fotoOriginal),
     };
@@ -266,12 +288,16 @@ const ProfileScreen = () => {
       return normalizarUrlImagen(item.imagen_url);
     }
 
+    if (item?.imagen) {
+      return normalizarUrlImagen(item.imagen);
+    }
+
     return null;
   };
 
   const mapearProductos = (lista: any[]): Producto[] => {
     return lista.map((item: any) => ({
-      id: item.id,
+      id: Number(item.id),
       nombre: item.nombre,
       descripcion: item.descripcion,
       precio: item.precio,
@@ -287,6 +313,7 @@ const ProfileScreen = () => {
 
   const extraerPagination = (payload: any): ApiPagination | null => {
     if (payload?.pagination) return payload.pagination;
+    if (payload?.data?.pagination) return payload.data.pagination;
     return null;
   };
 
@@ -305,7 +332,7 @@ const ProfileScreen = () => {
       throw new Error(meData?.message || "No se pudo cargar la información del usuario.");
     }
 
-    const miId = meData?.data?.id ?? meData?.id ?? null;
+    const miId = Number(meData?.data?.id ?? meData?.id ?? 0) || null;
     setMiUsuarioId(miId);
 
     return {
@@ -378,7 +405,8 @@ const ProfileScreen = () => {
       }
 
       const dataVendedor = data?.data ?? data;
-      setPerfil(mapearPerfil(dataVendedor));
+      const perfilMapeado = mapearPerfil(dataVendedor);
+      setPerfil(perfilMapeado);
 
       const productosCrudos = Array.isArray(dataVendedor?.productos?.data)
         ? dataVendedor.productos.data
@@ -392,12 +420,17 @@ const ProfileScreen = () => {
 
       const pagination =
         dataVendedor?.productos?.pagination ??
+        dataVendedor?.productos?.meta ??
         data?.pagination ??
         null;
 
       if (pagination) {
-        const currentPage = Number(pagination?.current_page ?? pageToLoad);
-        const serverLastPage = Number(pagination?.last_page ?? pageToLoad);
+        const currentPage = Number(
+          pagination?.current_page ?? pagination?.currentPage ?? pageToLoad
+        );
+        const serverLastPage = Number(
+          pagination?.last_page ?? pagination?.lastPage ?? pageToLoad
+        );
         setPage(currentPage);
         setLastPage(serverLastPage);
         setHasMore(currentPage < serverLastPage);
@@ -445,7 +478,12 @@ const ProfileScreen = () => {
           return;
         }
 
-        await cargarProductosPerfilExterno(token, userIdNumber, pageToLoad, pageToLoad === 1);
+        await cargarProductosPerfilExterno(
+          token,
+          userIdNumber,
+          pageToLoad,
+          pageToLoad === 1
+        );
       } catch (error: any) {
         Alert.alert("Error", error?.message || "Ocurrió un error al cargar el perfil.");
       } finally {
@@ -567,7 +605,14 @@ const ProfileScreen = () => {
 
   const renderHeader = () => (
     <>
-      <View style={{ marginBottom: 8, alignItems: "flex-start", paddingHorizontal: 16, paddingTop: 12 }}>
+      <View
+        style={{
+          marginBottom: 8,
+          alignItems: "flex-start",
+          paddingHorizontal: 16,
+          paddingTop: 12,
+        }}
+      >
         <CustomButton
           variant="text-only"
           color="secondary"
@@ -694,7 +739,9 @@ const ProfileScreen = () => {
                   variant="icon-only"
                   color="sextary"
                   onPress={() => router.push("/editprofile" as any)}
-                  icon={<MaterialCommunityIcons name="account-edit" size={20} color="#fff" />}
+                  icon={
+                    <MaterialCommunityIcons name="account-edit" size={20} color="#fff" />
+                  }
                 />
 
                 <CustomButton
@@ -711,29 +758,7 @@ const ProfileScreen = () => {
                   icon={<Ionicons name="chatbox-outline" size={20} color="#fff" />}
                 />
               </View>
-            ) : (
-              <View style={{ marginTop: 18 }}>
-                <Pressable
-                  style={{
-                    backgroundColor: colors.success,
-                    paddingVertical: 14,
-                    borderRadius: 14,
-                  }}
-                  onPress={() => router.push("/(tabs)/Chats" as any)}
-                >
-                  <Text
-                    style={{
-                      color: "#FFFFFF",
-                      textAlign: "center",
-                      fontSize: 16,
-                      fontWeight: "600",
-                    }}
-                  >
-                    Chatear con el vendedor
-                  </Text>
-                </Pressable>
-              </View>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -754,7 +779,14 @@ const ProfileScreen = () => {
         </Text>
 
         {productos.length === 0 && !loading ? (
-          <Text style={{ textAlign: "center", color: colors.textMuted, marginTop: 12, marginBottom: 12 }}>
+          <Text
+            style={{
+              textAlign: "center",
+              color: colors.textMuted,
+              marginTop: 12,
+              marginBottom: 12,
+            }}
+          >
             {esMiPerfil
               ? "Aún no has publicado productos."
               : "Este usuario aún no tiene productos publicados."}
@@ -769,7 +801,9 @@ const ProfileScreen = () => {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator size="large" color={colors.success} />
-          <Text style={{ marginTop: 12, color: colors.textMuted }}>Cargando perfil...</Text>
+          <Text style={{ marginTop: 12, color: colors.textMuted }}>
+            Cargando perfil...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -777,7 +811,10 @@ const ProfileScreen = () => {
 
   return (
     <>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "bottom"]}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: colors.background }}
+        edges={["top", "bottom"]}
+      >
         <FlatList
           data={productos}
           key={2}
@@ -793,9 +830,17 @@ const ProfileScreen = () => {
                   source={item.imagen_url ? { uri: item.imagen_url } : undefined}
                   defaultImage={defaultProductImage}
                   price={formatearPrecio(item.precio)}
-                  onPress={() => router.push(`/product/${item.id}` as any)}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/product/[id]",
+                      params: { id: String(item.id) },
+                    })
+                  }
                   onCartPress={() =>
-                    router.push(`/product/${item.id}?modal=true` as any)
+                    router.push({
+                      pathname: "/product/[id]",
+                      params: { id: String(item.id), modal: "true" },
+                    })
                   }
                 >
                   {item.nombre}

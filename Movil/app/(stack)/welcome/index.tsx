@@ -67,7 +67,7 @@ const welcomeScreen = () => {
             textShadowRadius: 4,
           }}
           >
-            Tu Mercado SENA
+            Tu Mercado SENAA
         </Text>
       </Header>
 

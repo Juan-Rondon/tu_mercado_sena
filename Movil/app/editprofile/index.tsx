@@ -286,7 +286,7 @@ const EditProfileScreen = () => {
 
       formData.append("nickname", nickname.trim());
       formData.append("descripcion", descripcion.trim());
-      formData.append("link", link.trim());
+      formData.append("link", link.trim().replace(/\s+/g, ""));
 
       if (nuevaFoto) {
         formData.append("imagen", {

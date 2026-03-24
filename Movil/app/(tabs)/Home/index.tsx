@@ -306,12 +306,16 @@ const HomeScreen = () => {
     const max = Number(limpiarNumero(precioMax) || 0);
 
     if (q) {
-      productos = productos.filter((p) => {
-        const nombre = (p.nombre ?? "").toLowerCase();
-        const desc = (p.descripcion ?? "").toLowerCase();
-        const categoria = (p.categoria?.nombre ?? "").toLowerCase();
+  productos = productos.filter((p) => {
+    const nombre = (p.nombre ?? "").toLowerCase().trim();
+    // const desc = (p.descripcion ?? "").toLowerCase().trim();
+    // const categoria = (p.categoria?.nombre ?? "").toLowerCase().trim();
 
-        return nombre.includes(q) || desc.includes(q) || categoria.includes(q);
+    return (
+      nombre.startsWith(q)
+      // desc.startsWith(q) ||
+      // categoria.startsWith(q)
+        );
       });
     }
 

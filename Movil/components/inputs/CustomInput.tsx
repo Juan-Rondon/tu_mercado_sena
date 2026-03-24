@@ -36,6 +36,7 @@ const CustomInput = ({
   onChangeText,
   icon,
   showPasswordToggle = true,
+  editable = true,
   ...rest
 }: Props) => {
   const { colors, isDark } = useAppTheme();
@@ -86,72 +87,97 @@ const CustomInput = ({
     onChangeText?.(t);
   };
 
+  const focusInput = () => {
+    if (!editable) return;
+    inputRef.current?.focus();
+  };
+
   return (
-    <View
-      className={`flex-row items-center rounded-full px-4 ${className ?? ""} ${containerClassName ?? ""}`}
-      style={[
-        styles.container,
+    <Pressable
+      onPress={focusInput}
+      style={({ pressed }) => [
+        styles.pressable,
         {
-          backgroundColor: isDark
-            ? colors.surface ?? "#1E1E1E"
-            : colors.surface ?? "#F5F5F7",
-          borderColor: isDark
-            ? colors.border ?? "#3A3A3C"
-            : colors.border ?? "#D9D9D9",
+          opacity: pressed ? 0.98 : 1,
         },
-        containerStyle,
       ]}
     >
-      {icon && <View style={styles.iconContainer}>{icon}</View>}
-
-      <TextInput
-        ref={inputRef}
-        value={value ?? ""}
-        onKeyPress={handleKeyPress}
-        onChangeText={handleChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={placeholderTextColor ?? colors.textMuted ?? (isDark ? "#A1A1AA" : "#6B7280")}
-        secureTextEntry={isPassword ? !showPassword : false}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        spellCheck={false}
-        cursorColor={colors.primary ?? "#2563EB"}
-        selectionColor={colors.primary ?? "#2563EB"}
-        textContentType={
-          isPassword ? "none" : isEmail ? "emailAddress" : rest.textContentType
-        }
-        autoComplete={isPassword ? "off" : isEmail ? "email" : rest.autoComplete}
+      <View
+        className={`flex-row items-center rounded-full px-4 ${className ?? ""} ${containerClassName ?? ""}`}
         style={[
-          styles.input,
+          styles.container,
           {
-            color: colors.text ?? (isDark ? "#FFFFFF" : "#111827"),
+            backgroundColor: isDark
+              ? colors.surface ?? "#1E1E1E"
+              : colors.surface ?? "#F5F5F7",
+            borderColor: isDark
+              ? colors.border ?? "#3A3A3C"
+              : colors.border ?? "#D9D9D9",
           },
+          containerStyle,
         ]}
-        {...rest}
-      />
+      >
+        {icon ? <View style={styles.iconContainer}>{icon}</View> : null}
 
-      {isPassword && showPasswordToggle && (
-        <Pressable
-          onPress={() => setShowPassword((p) => !p)}
-          hitSlop={10}
-          style={styles.eyeBtn}
-        >
-          <Ionicons
-            name={showPassword ? "eye-outline" : "eye-off-outline"}
-            size={20}
-            color={colors.textMuted ?? (isDark ? "#A1A1AA" : "#6B7280")}
-          />
-        </Pressable>
-      )}
-    </View>
+        <TextInput
+          ref={inputRef}
+          value={value ?? ""}
+          onKeyPress={handleKeyPress}
+          onChangeText={handleChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={
+            placeholderTextColor ??
+            colors.textMuted ??
+            (isDark ? "#A1A1AA" : "#6B7280")
+          }
+          secureTextEntry={isPassword ? !showPassword : false}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          spellCheck={false}
+          editable={editable}
+          cursorColor={colors.primary ?? "#2563EB"}
+          selectionColor={colors.primary ?? "#2563EB"}
+          textContentType={
+            isPassword ? "none" : isEmail ? "emailAddress" : rest.textContentType
+          }
+          autoComplete={isPassword ? "off" : isEmail ? "email" : rest.autoComplete}
+          underlineColorAndroid="transparent"
+          style={[
+            styles.input,
+            {
+              color: colors.text ?? (isDark ? "#FFFFFF" : "#111827"),
+            },
+          ]}
+          {...rest}
+        />
+
+        {isPassword && showPasswordToggle && (
+          <Pressable
+            onPress={() => setShowPassword((p) => !p)}
+            hitSlop={10}
+            style={styles.eyeBtn}
+          >
+            <Ionicons
+              name={showPassword ? "eye-outline" : "eye-off-outline"}
+              size={20}
+              color={colors.textMuted ?? (isDark ? "#A1A1AA" : "#6B7280")}
+            />
+          </Pressable>
+        )}
+      </View>
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
+  pressable: {
+    width: "100%",
+  },
   container: {
     borderWidth: 1,
     minHeight: 52,
+    width: "100%",
   },
   iconContainer: {
     marginRight: 8,
@@ -159,7 +185,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
+    minHeight: 52,
     paddingVertical: 12,
+    paddingHorizontal: 0,
   },
   eyeBtn: {
     paddingLeft: 10,

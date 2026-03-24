@@ -1,14 +1,21 @@
 import { useAppTheme } from "@/src/theme/ThemeProvider";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function ModoOscuro() {
   const router = useRouter();
   const { themeMode, resolvedTheme, colors, setThemeMode } = useAppTheme();
 
+  useEffect(() => {
+    if (themeMode !== "light") {
+      setThemeMode("light");
+    }
+  }, [themeMode, setThemeMode]);
+
   const opciones: {
-    key: "light" | "dark" | "system";
+    key: "light";
     titulo: string;
     descripcion: string;
     icono: keyof typeof Ionicons.glyphMap;
@@ -18,18 +25,6 @@ export default function ModoOscuro() {
       titulo: "Claro",
       descripcion: "La aplicación siempre se verá en modo claro.",
       icono: "sunny-outline",
-    },
-    {
-      key: "dark",
-      titulo: "Oscuro",
-      descripcion: "La aplicación siempre se verá en modo oscuro.",
-      icono: "moon-outline",
-    },
-    {
-      key: "system",
-      titulo: "Automático",
-      descripcion: "La aplicación seguirá la configuración del celular.",
-      icono: "phone-portrait-outline",
     },
   ];
 
@@ -177,11 +172,7 @@ export default function ModoOscuro() {
           >
             Preferencia seleccionada:{" "}
             <Text style={{ color: colors.text, fontWeight: "700" }}>
-              {themeMode === "light"
-                ? "Claro"
-                : themeMode === "dark"
-                ? "Oscuro"
-                : "Automático"}
+              Claro
             </Text>
             {"\n"}
             Tema aplicado ahora mismo:{" "}
@@ -199,9 +190,7 @@ export default function ModoOscuro() {
             lineHeight: 20,
           }}
         >
-          En modo automático, la aplicación seguirá la apariencia configurada en
-          tu dispositivo. En modo claro u oscuro, la app usará siempre ese tema
-          sin importar la configuración del celular.
+          La aplicación usará únicamente el tema claro.
         </Text>
       </ScrollView>
     </View>

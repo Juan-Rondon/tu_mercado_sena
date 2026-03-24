@@ -125,47 +125,51 @@ const CustomButton = React.forwardRef<View, Props>(
     }[color];
 
     const Content = () => {
-      const effectiveTextColor =
-        variant === 'text-only' ? textOnlyColor : textColor;
+  const effectiveTextColor =
+    variant === 'text-only' ? textOnlyColor : textColor;
 
-      if (variant === 'card' && price) {
-        return (
-          <>
-            <View className="flex-row items-center justify-center">
-              <Text
-                numberOfLines={2}
-                className={`text-center w-full ${textColor} ${FontText}`}
-              >
-                {children}
-              </Text>
-            </View>
-
-            <View className="flex-row items-center justify-center">
-              <Text className={`text-center text-sm ${textColor} ${FontText}`}>
-                {price}
-              </Text>
-            </View>
-          </>
-        );
-      }
-
-      return (
-        <View
-          className={`flex-row items-center justify-center ${
-            icon && iconPosition === 'right' ? 'flex-row-reverse' : ''
-          }`}
-        >
-          {icon && <View className="mr-2">{icon}</View>}
+  if (variant === 'card' && price) {
+    return (
+      <>
+        <View className="flex-row items-center justify-center">
           <Text
-            className={`text-center ${effectiveTextColor} ${
-              underline ? 'underline' : ''
-            } ${FontText}`}
+            numberOfLines={2}
+            className={`text-center w-full ${textColor} ${FontText}`}
           >
             {children}
           </Text>
         </View>
-      );
-    };
+
+        <View className="flex-row items-center justify-center">
+          <Text className={`text-center text-sm ${textColor} ${FontText}`}>
+            {price}
+          </Text>
+        </View>
+      </>
+    );
+  }
+
+  if (React.isValidElement(children) && typeof children !== "string") {
+    return <>{children}</>;
+  }
+
+  return (
+    <View
+      className={`flex-row items-center justify-center ${
+        icon && iconPosition === 'right' ? 'flex-row-reverse' : ''
+      }`}
+    >
+      {icon && <View className="mr-2">{icon}</View>}
+      <Text
+        className={`text-center ${effectiveTextColor} ${
+          underline ? 'underline' : ''
+        } ${FontText}`}
+      >
+        {children}
+      </Text>
+    </View>
+  );
+};
 
     const openCamera = async () => {
       const permission = await ImagePicker.requestCameraPermissionsAsync();

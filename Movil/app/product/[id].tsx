@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   NativeScrollEvent,
@@ -31,6 +32,7 @@ type ApiFoto = {
 type ApiVendedor = {
   id?: number;
   nickname?: string | null;
+  nombre?: string | null;
   imagen?: string | null;
   imagen_url?: string | null;
 };
@@ -54,6 +56,16 @@ type RelatedItem = {
   imageSource?: ImageSourcePropType;
 };
 
+type FavoriteApiItem = {
+  id: number;
+  votante_id: number;
+  usuario_votado?: {
+    id: number;
+    nickname?: string | null;
+    imagen?: string | null;
+  };
+};
+
 export default function ProductDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -67,9 +79,13 @@ export default function ProductDetail() {
   const [relatedProducts, setRelatedProducts] = useState<RelatedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState<number | null>(null);
+  const [openingChat, setOpeningChat] = useState(false);
 
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const imageHeight = Math.max(220, Math.min(320, width * 0.75));
   const cardWidth = Math.max(180, Math.min(220, width * 0.55));
@@ -108,19 +124,25 @@ export default function ProductDetail() {
       return limpio;
     }
 
+    const apiHost = API_BASE_URL.replace(/\/api$/, "");
+
     if (limpio.startsWith("usuarios/")) {
-      return `${API_BASE_URL}/storage/${limpio}`;
+      return `${apiHost}/storage/${limpio}`;
     }
 
-    if (limpio.startsWith("/storage/") || limpio.startsWith("storage/")) {
-      return `${API_BASE_URL}/${limpio.replace(/^\/+/, "")}`;
+    if (limpio.startsWith("/storage/")) {
+      return `${apiHost}${limpio}`;
+    }
+
+    if (limpio.startsWith("storage/")) {
+      return `${apiHost}/${limpio}`;
     }
 
     if (limpio.startsWith("/")) {
-      return `${API_BASE_URL}${limpio}`;
+      return `${apiHost}${limpio}`;
     }
 
-    return limpio;
+    return `${apiHost}/${limpio}`;
   };
 
   const mapProductosAItems = (productos: ApiProducto[]): RelatedItem[] => {
@@ -146,11 +168,78 @@ export default function ProductDetail() {
     });
   };
 
+  const obtenerListaFavoritos = (payload: any): FavoriteApiItem[] => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.favoritos)) return payload.favoritos;
+    if (Array.isArray(payload?.data?.favoritos)) return payload.data.favoritos;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
+  };
+
+  const extraerIdsFavoritos = (payload: any): number[] => {
+    const lista = obtenerListaFavoritos(payload);
+
+    return lista
+      .map((item: any) =>
+        Number(
+          item?.usuario_votado?.id ??
+            item?.votado_id ??
+            item?.usuario?.id ??
+            item?.usuario_id ??
+            0
+        )
+      )
+      .filter((n: number) => Number.isFinite(n) && n > 0);
+  };
+
+  const consultarEstadoFavorito = async (
+    token: string,
+    sellerId: number | null,
+    isOwner: boolean
+  ) => {
+    if (!token || !sellerId || isOwner) {
+      setIsFavorite(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/favoritos`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const json = await response.json().catch(() => null);
+
+      console.log("GET FAVORITOS STATUS:", response.status);
+      console.log("GET FAVORITOS JSON:", json);
+
+      if (!response.ok) {
+        setIsFavorite(false);
+        return;
+      }
+
+      const favoritosIds = extraerIdsFavoritos(json);
+      setIsFavorite(favoritosIds.includes(Number(sellerId)));
+    } catch (error) {
+      console.log("ERROR CONSULTANDO FAVORITOS:", error);
+      setIsFavorite(false);
+    }
+  };
+
   const fetchProductAndSuggestions = async () => {
     try {
       setLoading(true);
 
       const token = await getToken();
+
+      if (!token) {
+        setLoading(false);
+        setProduct(null);
+        return;
+      }
 
       const meResponse = await fetch(`${API_BASE_URL}/auth/me`, {
         method: "GET",
@@ -161,11 +250,11 @@ export default function ProductDetail() {
       });
 
       const meJson = await meResponse.json().catch(() => null);
+      console.log("AUTH ME STATUS:", meResponse.status);
+      console.log("AUTH ME JSON:", meJson);
 
-      if (meResponse.ok) {
-        const miId = meJson?.data?.id ?? meJson?.id ?? null;
-        setMyUserId(miId);
-      }
+      const miId = Number(meJson?.data?.id ?? meJson?.id ?? 0) || null;
+      setMyUserId(miId);
 
       const productResponse = await fetch(`${API_BASE_URL}/productos/${id}`, {
         method: "GET",
@@ -194,29 +283,38 @@ export default function ProductDetail() {
                 return uri ? { uri } : null;
               })
               .filter(Boolean) as { uri: string }[]
+          : normalizarUrlImagen(p?.imagen_url || p?.imagen || null)
+          ? [{ uri: normalizarUrlImagen(p?.imagen_url || p?.imagen || null)! }]
           : [];
 
       const sellerImageUrl = normalizarUrlImagen(
         p?.vendedor?.imagen_url || p?.vendedor?.imagen || null
       );
 
-      const sellerId = p.vendedor?.id ?? p.vendedor_id ?? null;
+      const sellerId = p?.vendedor?.id ?? p?.vendedor_id ?? null;
+
       const isOwner =
         sellerId !== null &&
-        meJson &&
-        Number(sellerId) === Number(meJson?.data?.id ?? meJson?.id ?? null);
+        miId !== null &&
+        Number(sellerId) === Number(miId);
 
       setProduct({
         id: p.id,
         name: p.nombre,
         description: p.descripcion ?? "",
         price: formatCOP(Number(p.precio || 0)),
-        seller: p.vendedor?.nickname ?? "Usuario",
-        sellerId,
+        seller: p.vendedor?.nickname ?? p.vendedor?.nombre ?? "Usuario",
+        sellerId: sellerId ? Number(sellerId) : null,
         sellerImage: sellerImageUrl ? { uri: sellerImageUrl } : defaultUserImage,
         images,
         isOwner,
       });
+
+      await consultarEstadoFavorito(
+        token,
+        sellerId ? Number(sellerId) : null,
+        isOwner
+      );
 
       const relatedResponse = await fetch(`${API_BASE_URL}/productos`, {
         method: "GET",
@@ -248,7 +346,9 @@ export default function ProductDetail() {
         const mismoProducto = Number(item.id) === Number(p.id);
         const sellerIdItem = item.vendedor?.id ?? item.vendedor_id ?? null;
         const mismoVendedor =
-          sellerIdActual !== null && sellerIdItem === sellerIdActual;
+          sellerIdActual !== null &&
+          sellerIdItem !== null &&
+          Number(sellerIdItem) === Number(sellerIdActual);
 
         return !mismoProducto && !mismoVendedor;
       });
@@ -257,12 +357,123 @@ export default function ProductDetail() {
     } catch (error) {
       console.log("ERROR:", error);
       setRelatedProducts([]);
+      setIsFavorite(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleModalScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const toggleFavorito = async () => {
+    try {
+      if (favoriteLoading) return;
+
+      if (!product?.sellerId) {
+        Alert.alert(
+          "No fue posible actualizar favoritos",
+          "No se encontró el vendedor."
+        );
+        return;
+      }
+
+      if (!myUserId) {
+        Alert.alert(
+          "No fue posible actualizar favoritos",
+          "No se pudo identificar tu usuario."
+        );
+        return;
+      }
+
+      if (product?.isOwner) {
+        return;
+      }
+
+      setFavoriteLoading(true);
+
+      const token = await getToken();
+
+      if (!token) {
+        Alert.alert(
+          "No fue posible actualizar favoritos",
+          "No se encontró la sesión del usuario."
+        );
+        return;
+      }
+
+      if (isFavorite) {
+        const response = await fetch(
+          `${API_BASE_URL}/favoritos/${Number(product.sellerId)}`,
+          {
+            method: "DELETE",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const json = await response.json().catch(() => null);
+
+        console.log("DELETE FAVORITO STATUS:", response.status);
+        console.log("DELETE FAVORITO JSON:", json);
+
+        if (!response.ok) {
+          const msg =
+            json?.message ||
+            json?.error ||
+            "No fue posible eliminar el usuario de favoritos.";
+          Alert.alert("Error", msg);
+          return;
+        }
+
+        setIsFavorite(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/favoritos/${Number(product.sellerId)}`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            votante_id: Number(myUserId),
+            votado_id: Number(product.sellerId),
+          }),
+        }
+      );
+
+      const json = await response.json().catch(() => null);
+
+      console.log("POST FAVORITO STATUS:", response.status);
+      console.log("POST FAVORITO JSON:", json);
+
+      if (!response.ok) {
+        const msg =
+          json?.message ||
+          json?.error ||
+          "No fue posible agregar el usuario a favoritos.";
+        Alert.alert("Error", msg);
+        return;
+      }
+
+      setIsFavorite(true);
+    } catch (error) {
+      console.log("ERROR TOGGLE FAVORITO:", error);
+      Alert.alert(
+        "Error",
+        "Ocurrió un error inesperado al actualizar favoritos."
+      );
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
+
+  const handleModalScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>
+  ) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const currentIndex = Math.round(offsetX / width);
     setSelectedIndex(currentIndex);
@@ -291,6 +502,146 @@ export default function ProductDetail() {
 
   const irAlHome = () => {
     router.push("/(tabs)/Home" as any);
+  };
+
+  const irAChatConVendedor = async () => {
+    try {
+      if (openingChat) return;
+
+      console.log("CLICK CHAT");
+      console.log("product?.sellerId:", product?.sellerId);
+      console.log("product?.id:", product?.id);
+      console.log("myUserId:", myUserId);
+
+      if (!product?.sellerId || !product?.id) {
+        Alert.alert(
+          "No fue posible abrir el chat",
+          "Falta información del producto o del vendedor."
+        );
+        return;
+      }
+
+      if (!myUserId) {
+        Alert.alert(
+          "No fue posible abrir el chat",
+          "No se pudo identificar tu usuario."
+        );
+        return;
+      }
+
+      if (Number(product.sellerId) === Number(myUserId)) {
+        Alert.alert(
+          "Chat no disponible",
+          "No puedes iniciar un chat contigo mismo."
+        );
+        return;
+      }
+
+      setOpeningChat(true);
+
+      const token = await getToken();
+      if (!token) {
+        Alert.alert(
+          "No fue posible abrir el chat",
+          "No se encontró la sesión del usuario."
+        );
+        return;
+      }
+
+      let chatId: number | null = null;
+
+      const chatsResponse = await fetch(`${API_BASE_URL}/chats`, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const chatsJson = await chatsResponse.json().catch(() => null);
+
+      console.log("CHATS STATUS:", chatsResponse.status);
+      console.log("CHATS JSON:", chatsJson);
+
+      if (chatsResponse.ok) {
+        const listaChats = Array.isArray(chatsJson)
+          ? chatsJson
+          : Array.isArray(chatsJson?.data)
+          ? chatsJson.data
+          : [];
+
+        const chatExistente = listaChats.find((chat: any) => {
+          const usuarioId = Number(chat?.usuario?.id ?? 0);
+          return usuarioId === Number(product.sellerId);
+        });
+
+        console.log("CHAT EXISTENTE:", chatExistente);
+
+        if (chatExistente?.id) {
+          chatId = Number(chatExistente.id);
+        }
+      }
+
+      if (!chatId) {
+        const createResponse = await fetch(
+          `${API_BASE_URL}/productos/${Number(product.id)}/chats`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const createJson = await createResponse.json().catch(() => null);
+
+        console.log("CREATE STATUS:", createResponse.status);
+        console.log("CREATE JSON:", createJson);
+
+        if (!createResponse.ok) {
+          const msg =
+            createJson?.message ||
+            createJson?.error ||
+            "No fue posible iniciar el chat con el vendedor.";
+          Alert.alert("No fue posible abrir el chat", msg);
+          return;
+        }
+
+        chatId = Number(createJson?.data?.id ?? createJson?.id ?? 0) || null;
+      }
+
+      console.log("CHAT ID FINAL:", chatId);
+
+      if (!chatId) {
+        Alert.alert(
+          "No fue posible abrir el chat",
+          "No se pudo obtener el identificador del chat."
+        );
+        return;
+      }
+
+      router.push({
+        pathname: "/chatUser/[id]",
+        params: {
+          id: String(chatId),
+          otherUserId: String(product.sellerId),
+          otherUserName: String(product.seller ?? "Vendedor"),
+          otherUserImage:
+            typeof product?.sellerImage?.uri === "string"
+              ? product.sellerImage.uri
+              : "",
+        },
+      });
+    } catch (error) {
+      console.log("ERROR ABRIENDO CHAT CON VENDEDOR:", error);
+      Alert.alert(
+        "No fue posible abrir el chat",
+        "Ocurrió un error inesperado."
+      );
+    } finally {
+      setOpeningChat(false);
+    }
   };
 
   if (loading) {
@@ -404,8 +755,7 @@ export default function ProductDetail() {
             Vendido por:
           </Text>
 
-          <Pressable
-            onPress={irAlPerfilVendedor}
+          <View
             style={{
               marginTop: 10,
               flexDirection: "row",
@@ -418,29 +768,84 @@ export default function ProductDetail() {
               paddingVertical: 12,
             }}
           >
-            <Image
-              source={product.sellerImage}
-              defaultSource={defaultUserImage}
+            <Pressable
+              onPress={irAlPerfilVendedor}
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: colors.surface,
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
               }}
-              resizeMode="cover"
+            >
+              <Image
+                source={product.sellerImage}
+                defaultSource={defaultUserImage}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.surface,
+                }}
+                resizeMode="cover"
+              />
+
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontWeight: "600",
+                    color: colors.text,
+                  }}
+                >
+                  {product.seller}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: colors.textMuted,
+                    marginTop: 2,
+                  }}
+                >
+                  Ver perfil del vendedor
+                </Text>
+              </View>
+            </Pressable>
+
+            {!product.isOwner && (
+              <Pressable
+                onPress={toggleFavorito}
+                disabled={favoriteLoading}
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginLeft: 10,
+                  backgroundColor: isFavorite
+                    ? "rgba(255, 59, 48, 0.12)"
+                    : colors.surface,
+                  opacity: favoriteLoading ? 0.7 : 1,
+                }}
+              >
+                {favoriteLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons
+                    name={isFavorite ? "heart" : "heart-outline"}
+                    size={22}
+                    color={isFavorite ? "#FF3B30" : colors.textMuted}
+                  />
+                )}
+              </Pressable>
+            )}
+
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textMuted}
+              style={{ marginLeft: 8 }}
             />
-
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>
-                {product.seller}
-              </Text>
-              <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 2 }}>
-                Ver perfil del vendedor
-              </Text>
-            </View>
-
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-          </Pressable>
+          </View>
 
           {product.isOwner ? (
             <Pressable
@@ -467,11 +872,13 @@ export default function ProductDetail() {
             <Pressable
               style={{
                 marginTop: 18,
-                backgroundColor: colors.success,
+                backgroundColor: openingChat ? colors.textMuted : colors.success,
                 paddingVertical: 14,
                 borderRadius: 14,
+                opacity: openingChat ? 0.85 : 1,
               }}
-              onPress={() => router.push("/(tabs)/Chats")}
+              onPress={irAChatConVendedor}
+              disabled={openingChat}
             >
               <Text
                 style={{
@@ -481,7 +888,7 @@ export default function ProductDetail() {
                   fontWeight: "600",
                 }}
               >
-                Chatear con el vendedor
+                {openingChat ? "Abriendo chat..." : "Chatear con el vendedor"}
               </Text>
             </Pressable>
           )}

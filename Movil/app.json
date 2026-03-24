@@ -2,7 +2,11 @@
   "expo": {
     "name": "Mercado Sena",
     "slug": "mercado-sena",
+    "icon": "./assets/images/icon.png",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "scheme": "mercadosena",
     "userInterfaceStyle": "automatic",
@@ -14,8 +18,8 @@
       "package": "com.juan.mercadosena",
       "adaptiveIcon": {
         "backgroundColor": "#2DC75C",
-        "foregroundImage": "./assets/images/adaptative-icon.png",
-        "monochromeImage": "./assets/images/adaptative-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png"
+        // "monochromeImage": "./assets/images/adaptative-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
